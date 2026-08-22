@@ -21,10 +21,13 @@
     "@crawlee/cheerio": "^3.18.1",
     "@crawlee/core": "^3.18.1",
     "@crawlee/memory-storage": "^3.18.1",
+    "@crawlee/playwright": "^3.18.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@mozilla/readability": "^0.6.0",
     "jsdom": "^30.0.1",
+    "playwright": "^1.62.1",
     "turndown": "^7.2.4",
+    "undici": "^8.10.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

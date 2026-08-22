@@ -170,6 +170,47 @@ check('remoteOnly filters to remote roles',
     remote.itemCount > 0 && (remote.items ?? []).every((j: any) => j.remote === true),
     `itemCount=${remote.itemCount}`);
 
+// --- rag-browser -----------------------------------------------------------
+console.log('\n… live web search\n');
+const searched = payload(
+    await client.callTool({
+        name: 'call-actor',
+        arguments: {
+            actor: 'apify/rag-web-browser', // exercises the alias too
+            input: { query: 'crawlee playwright crawler documentation', maxResults: 3, maxCharsPerPage: 500 },
+            timeoutSecs: 240,
+        },
+    }),
+);
+check('rag-browser searches and fetches', searched.status === 'SUCCEEDED' && searched.itemCount >= 1,
+    `${searched.status} itemCount=${searched.itemCount}`);
+check('results carry url and markdown',
+    (searched.items ?? []).every((i: any) => /^https?:/.test(i.url) && typeof i.markdown === 'string'));
+
+const direct = payload(
+    await client.callTool({
+        name: 'call-actor',
+        arguments: { actor: 'web/rag-browser', input: { urls: ['https://example.com/'], fetchContent: true }, timeoutSecs: 90 },
+    }),
+);
+check('rag-browser fetches explicit urls without searching', direct.itemCount === 1, `itemCount=${direct.itemCount}`);
+
+// --- google-maps -----------------------------------------------------------
+console.log('\n… google maps (drives a real browser)\n');
+const maps = payload(
+    await client.callTool({
+        name: 'call-actor',
+        arguments: { actor: 'maps/google-maps', input: { query: 'plumbers in Austin TX', maxResults: 5 }, timeoutSecs: 300 },
+    }),
+);
+check('maps returns businesses', maps.status === 'SUCCEEDED' && maps.itemCount >= 3,
+    `${maps.status} itemCount=${maps.itemCount} ${maps.error ?? ''}`);
+check('businesses have a name and a maps url',
+    (maps.items ?? []).every((b: any) => b.name && /^https:\/\/www\.google\.com\/maps\//.test(b.mapsUrl)));
+check('contact details extracted for most listings',
+    (maps.items ?? []).filter((b: any) => b.phone).length >= Math.ceil((maps.items ?? []).length / 2),
+    `${(maps.items ?? []).filter((b: any) => b.phone).length}/${(maps.items ?? []).length} have phones`);
+
 await client.close();
 console.log(`\n${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -1,0 +1,39 @@
+{
+  "title": "RAG Web Browser",
+  "description": "Searches the web and returns the top results as clean Markdown, ready to read or feed into a model. Give it a query and it finds pages and extracts their content in one step — the general-purpose 'look something up on the web' tool. Give it URLs instead of a query to just fetch those pages. Free: uses a public search endpoint and your own IP, no API key.",
+  "tags": ["search", "web", "browse", "rag", "markdown", "research", "lookup"],
+  "input": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "What to search for. Either this or `urls` is required."
+      },
+      "urls": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Fetch these URLs directly instead of searching."
+      },
+      "maxResults": {
+        "type": "integer",
+        "description": "How many search results to fetch and convert to Markdown.",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 20
+      },
+      "maxCharsPerPage": {
+        "type": "integer",
+        "description": "Truncate each page's Markdown to this length.",
+        "default": 8000,
+        "minimum": 500,
+        "maximum": 50000
+      },
+      "fetchContent": {
+        "type": "boolean",
+        "description": "Set false to return only search result titles and URLs without fetching the pages. Much faster when you just need links.",
+        "default": true
+      }
+    },
+    "additionalProperties": false
+  }
+}

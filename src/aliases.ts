@@ -9,7 +9,10 @@
  */
 export const ACTOR_ALIASES: Record<string, string> = {
     'apify/website-content-crawler': 'web/site-crawler',
-    'apify~website-content-crawler': 'web/site-crawler',
+    'apify/rag-web-browser': 'web/rag-browser',
+    'compass/crawler-google-places': 'maps/google-maps',
+    'compass/google-maps-scraper': 'maps/google-maps',
+    'nwua9Gu5YrADL7ZDj/google-maps-scraper': 'maps/google-maps',
 };
 
 export function resolveActorName(requested: string): string {

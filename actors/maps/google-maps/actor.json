@@ -1,0 +1,33 @@
+{
+  "title": "Google Maps Business Scraper",
+  "description": "Finds local businesses on Google Maps for a search term and area, returning name, rating, review count, category, address and — optionally — phone number and website. Useful for local lead lists and market research. Drives a real browser, so it is slower than the API-based Actors and should be used at modest volume; heavy use from one IP will get throttled.",
+  "tags": ["maps", "google", "local", "business", "leads", "places", "reviews"],
+  "input": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "What to search for, including the area. Example: \"dentists in Austin, TX\" or \"coffee shops near Shoreditch London\"."
+      },
+      "maxResults": {
+        "type": "integer",
+        "description": "How many businesses to return. Each one costs scrolling time; keep it modest.",
+        "default": 20,
+        "minimum": 1,
+        "maximum": 120
+      },
+      "includeDetails": {
+        "type": "boolean",
+        "description": "Open each listing to also collect phone number and website. Much slower — roughly two seconds per business — but this is where the contact details are.",
+        "default": false
+      },
+      "language": {
+        "type": "string",
+        "description": "Interface language code, e.g. 'en'. Affects how labels are worded.",
+        "default": "en"
+      }
+    },
+    "required": ["query"],
+    "additionalProperties": false
+  }
+}

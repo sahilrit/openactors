@@ -1,8 +1,6 @@
 import { CheerioCrawler } from '@crawlee/cheerio';
 import { RequestQueue } from '@crawlee/core';
-import { Readability } from '@mozilla/readability';
-import { JSDOM, VirtualConsole } from 'jsdom';
-import TurndownService from 'turndown';
+import { htmlToMarkdown } from '../../../src/extract.js';
 import type { ActorContext } from '../../../src/types.js';
 
 interface Input {
@@ -11,48 +9,6 @@ interface Input {
     maxDepth?: number;
     sameDomainOnly?: boolean;
     includeUrlPattern?: string;
-}
-
-const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
-// Keep the text, drop the chrome. These never carry article content.
-turndown.remove(['script', 'style', 'nav', 'footer', 'noscript', 'iframe', 'form']);
-
-/**
- * Extracts the main article from a page and converts it to Markdown.
- *
- * Readability is the same engine behind Firefox Reader Mode: it scores DOM
- * nodes by text density to find the content well, which is what removes
- * navigation and sidebars without per-site rules. When it finds nothing
- * article-shaped (a link hub, a landing page) we fall back to the whole body
- * rather than returning an empty string.
- */
-function htmlToMarkdown(html: string, url: string): { title: string; markdown: string } {
-    // jsdom logs every CSS parse error on real-world pages; that noise would
-    // otherwise land on stderr and corrupt the MCP stdio channel.
-    const virtualConsole = new VirtualConsole();
-    const dom = new JSDOM(html, { url, virtualConsole });
-
-    let title = dom.window.document.title ?? '';
-    let contentHtml: string;
-
-    try {
-        const article = new Readability(dom.window.document.cloneNode(true) as Document).parse();
-        if (article?.content && article.content.length > 200) {
-            contentHtml = article.content;
-            title = article.title || title;
-        } else {
-            contentHtml = dom.window.document.body?.innerHTML ?? '';
-        }
-    } catch {
-        contentHtml = dom.window.document.body?.innerHTML ?? '';
-    }
-
-    const markdown = turndown
-        .turndown(contentHtml)
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-
-    return { title: title.trim(), markdown };
 }
 
 export async function run(input: Input, ctx: ActorContext): Promise<void> {

@@ -72,6 +72,8 @@ result goes straight into the agent's context.
 |---|---|---|
 | `web/site-crawler` | `apify/website-content-crawler` | Any site → clean Markdown. Boilerplate stripped via Readability. Runs from your own IP. |
 | `jobs/ats-boards` | paid ATS scrapers | Open roles straight from Greenhouse, Lever, Ashby, SmartRecruiters, Workable and Recruitee. **No scraping** — these are the public no-auth JSON APIs each ATS publishes so companies can embed listings. Nothing to block. |
+| `web/rag-browser` | `apify/rag-web-browser` | Search the web and get the top results as Markdown in one call. Tries Brave, then DuckDuckGo. |
+| `maps/google-maps` | `compass/crawler-google-places` | Local businesses with rating, category, address and phone. Drives a real browser — the slowest and most fragile Actor here. |
 
 ### ats-boards
 
@@ -127,10 +129,43 @@ and live board fetches. It is the only thing that proves the wire contract and
 the network behaviour together, which is why it runs against the real internet
 rather than mocks.
 
+## Proxies
+
+Everything works from your own IP by default, which is what makes it free.
+`PROXY_URL` is the single seam for changing that:
+
+```bash
+PROXY_URL=http://user:pass@host:port
+```
+
+It routes both HTTP requests and the browser. Nothing else needs to change —
+no Actor knows or cares whether a proxy is configured.
+
+## Notes on fragility
+
+The Actors are not equally durable, and it's worth knowing which is which:
+
+- `jobs/ats-boards` is the most durable. It reads documented JSON APIs; a break
+  would be a provider changing its public contract.
+- `web/site-crawler` and `web/rag-browser` are moderately durable. Search engines
+  reshape their result markup, which is why search tries more than one and says
+  in the log which one answered.
+- `maps/google-maps` is the least durable, by a distance. Google generates every
+  class name in a Maps card, so parsing works off the card's *rendered text*
+  instead — but Google still varies what it renders. Review counts, for example,
+  appear on some cards and not others; absent means `null`, never zero. The
+  parser is in `parse.ts`, separate from the browser driving, so it can be
+  unit-tested against captured card text.
+
 ## Limits, stated plainly
 
-- Free for sites that don't fingerprint hard. Google Maps and LinkedIn will
-  eventually need residential IPs; that is a `PROXY_URL` change, not a rewrite.
+- Free for sites that don't fingerprint hard. Google Maps at volume will need
+  residential IPs; that is a `PROXY_URL` change, not a rewrite.
+- `maps/google-maps` needs a browser. Playwright's bundled Chromium does not
+  support macOS 12, so the launcher prefers your installed Google Chrome and
+  falls back to bundled Chromium elsewhere.
+- Free search has no SLA. Querying an engine from one IP without a key draws
+  intermittent 429s; that is why there is a fallback chain rather than one engine.
 - Run history is in memory and is lost on restart. Scraped results are on disk
   and are not.
 - Respect the terms of service of whatever you point this at.
