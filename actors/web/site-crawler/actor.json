@@ -1,0 +1,40 @@
+{
+  "title": "Website Content Crawler",
+  "description": "Crawls one or more websites and returns each page as clean Markdown with boilerplate (navigation, sidebars, footers, ads) stripped out. Use this to turn documentation, blogs, or any site into text suitable for reading or RAG. Free and self-hosted: runs from your own IP with no API key.",
+  "tags": ["web", "crawler", "markdown", "content", "rag", "scrape", "documentation"],
+  "input": {
+    "type": "object",
+    "properties": {
+      "startUrls": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "One or more URLs to start crawling from."
+      },
+      "maxPages": {
+        "type": "integer",
+        "description": "Maximum number of pages to crawl in total. Keep this small (5-20) unless you specifically need a full site.",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 500
+      },
+      "maxDepth": {
+        "type": "integer",
+        "description": "How many links deep to follow from the start URLs. 0 means fetch only the start URLs themselves.",
+        "default": 1,
+        "minimum": 0,
+        "maximum": 10
+      },
+      "sameDomainOnly": {
+        "type": "boolean",
+        "description": "Only follow links that stay on the same hostname as the start URL.",
+        "default": true
+      },
+      "includeUrlPattern": {
+        "type": "string",
+        "description": "Optional regular expression. When set, only URLs matching it are crawled."
+      }
+    },
+    "required": ["startUrls"],
+    "additionalProperties": false
+  }
+}

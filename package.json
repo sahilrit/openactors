@@ -1,0 +1,43 @@
+{
+  "name": "openactors",
+  "version": "0.1.0",
+  "description": "A free, self-hosted MCP server exposing web scrapers as Apify-compatible Actors.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "openactors": "./dist/src/server.js"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/copy-manifests.mjs",
+    "dev": "tsx src/server.ts",
+    "inspect": "npx @modelcontextprotocol/inspector tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@crawlee/cheerio": "^3.18.1",
+    "@crawlee/core": "^3.18.1",
+    "@crawlee/memory-storage": "^3.18.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@mozilla/readability": "^0.6.0",
+    "jsdom": "^30.0.1",
+    "turndown": "^7.2.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^26.2.0",
+    "@types/turndown": "^5.0.6",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
