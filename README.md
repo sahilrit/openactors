@@ -33,16 +33,56 @@ npm install && npm run build
 
 ## Connect
 
+Local, over stdio — the normal case:
+
 ```json
 {
   "mcpServers": {
     "openactors": {
-      "command": "npx",
-      "args": ["tsx", "/Users/sahilsachdeva/Documents/openactors/src/server.ts"]
+      "command": "node",
+      "args": ["/absolute/path/to/openactors/dist/src/server.js"]
     }
   }
 }
 ```
+
+Remote, over HTTP:
+
+```bash
+AUTH_TOKEN=$(openssl rand -hex 24) PORT=8080 npm run start:http
+```
+
+```json
+{
+  "mcpServers": {
+    "openactors": {
+      "url": "https://your-host/mcp",
+      "headers": { "Authorization": "Bearer <your token>" }
+    }
+  }
+}
+```
+
+The HTTP server is stateless per request, like Apify's hosted one, but shares a
+single run history across them so `get-actor-run` can still find a run that
+`call-actor` just reported. `/health` lists the installed Actors.
+
+**Set `AUTH_TOKEN` before exposing the port.** This server runs arbitrary
+scrapers on request; an open one is someone else's scraping proxy. It is
+optional only so that local use stays frictionless, and the server warns at
+startup when it is unset.
+
+## Docker
+
+```bash
+docker build -t openactors .
+docker run -p 8080:8080 -e AUTH_TOKEN=... -v openactors-storage:/app/storage openactors
+```
+
+Built on the Playwright image, because `maps/google-maps` needs a real browser
+and its system libraries are the tedious part. The image tag tracks the
+`playwright` dependency — bumping one without the other fails at browser launch
+rather than at build time.
 
 ## Tools
 
@@ -190,6 +230,26 @@ The Actors are not equally durable, and it's worth knowing which is which:
 - Run history is in memory and is lost on restart. Scraped results are on disk
   and are not.
 - Respect the terms of service of whatever you point this at.
+
+## What is and isn't verified
+
+Worth being precise about, since "it's built" and "it's known to work" are
+different claims:
+
+**Verified end to end, against the live internet:** the MCP wire contract over
+both stdio and HTTP; `web/site-crawler` (single and multi-page, with link
+following); `jobs/ats-boards` against live Greenhouse, Lever, Ashby and
+SmartRecruiters boards; `web/rag-browser` search and direct fetch;
+`maps/google-maps` driving a real browser; the Apify actor-id aliases; and the
+LinkedIn gate refusing to run.
+
+**Unit tested:** the six ATS normalizers, the Google Maps card parser against
+captured real card text, and the LinkedIn daily budget.
+
+**Not verified:** `linkedin/jobs` extraction (needs a burner account this build
+did not have), the Workable and Recruitee adapters (no populated board was
+reachable — they are marked `verified: false` in `providers.ts`), and the Docker
+image (never built; the base tag was confirmed to exist upstream, nothing more).
 
 ## License
 

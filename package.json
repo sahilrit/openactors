@@ -15,7 +15,10 @@
     "dev": "tsx src/server.ts",
     "inspect": "npx @modelcontextprotocol/inspector tsx src/server.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:http": "tsx src/http.ts",
+    "start": "node dist/src/server.js",
+    "start:http": "node dist/src/http.js"
   },
   "dependencies": {
     "@crawlee/cheerio": "^3.18.1",
