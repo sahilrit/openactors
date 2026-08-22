@@ -41,13 +41,25 @@ export async function discoverActors(actorsDir = ACTORS_DIR): Promise<ActorManif
                 continue;
             }
 
+            // An Actor declaring requiresEnv is listed either way, but is only
+            // callable once its variables are set. Showing it while gated is
+            // deliberate: an agent that can see the Actor and the reason can
+            // tell the user what to configure.
+            const missing = (parsed.requiresEnv ?? []).filter((name) => !process.env[name]);
+            const gatedReason =
+                parsed.gatedReason ??
+                (missing.length > 0
+                    ? `requires ${missing.join(', ')} to be set in the environment`
+                    : undefined);
+
             found.push({
                 name: `${ns.name}/${entry.name}`,
                 title: parsed.title ?? entry.name,
                 description: parsed.description ?? '',
                 tags: parsed.tags ?? [],
                 input: parsed.input ?? { type: 'object', properties: {} },
-                gatedReason: parsed.gatedReason,
+                requiresEnv: parsed.requiresEnv,
+                gatedReason,
                 dir,
             });
         }

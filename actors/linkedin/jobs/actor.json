@@ -1,0 +1,40 @@
+{
+  "title": "LinkedIn Job Search (burner account only)",
+  "description": "Searches LinkedIn job listings and returns title, company, location, posted date and link. REQUIRES a LinkedIn session cookie from a SEPARATE THROWAWAY ACCOUNT — never your real one. LinkedIn restricts accounts it detects scraping, and a restriction on your main account during a job search is expensive. Requests are hard-capped at 80 per UTC day across all runs, with randomized delays.",
+  "tags": ["linkedin", "jobs", "hiring", "careers", "search"],
+  "requiresEnv": ["LINKEDIN_BURNER_COOKIE"],
+  "input": {
+    "type": "object",
+    "properties": {
+      "keywords": {
+        "type": "string",
+        "description": "Job search keywords, e.g. \"performance marketing manager\"."
+      },
+      "location": {
+        "type": "string",
+        "description": "Location filter, e.g. \"United Kingdom\" or \"Remote\"."
+      },
+      "remoteOnly": {
+        "type": "boolean",
+        "description": "Restrict to roles LinkedIn labels remote.",
+        "default": false
+      },
+      "postedWithinDays": {
+        "type": "integer",
+        "description": "Only roles posted within this many days.",
+        "default": 7,
+        "minimum": 1,
+        "maximum": 30
+      },
+      "maxResults": {
+        "type": "integer",
+        "description": "Maximum listings to return. Also bounded by the 80-per-day cap shared across all runs.",
+        "default": 25,
+        "minimum": 1,
+        "maximum": 80
+      }
+    },
+    "required": ["keywords"],
+    "additionalProperties": false
+  }
+}

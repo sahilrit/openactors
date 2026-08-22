@@ -74,6 +74,27 @@ result goes straight into the agent's context.
 | `jobs/ats-boards` | paid ATS scrapers | Open roles straight from Greenhouse, Lever, Ashby, SmartRecruiters, Workable and Recruitee. **No scraping** — these are the public no-auth JSON APIs each ATS publishes so companies can embed listings. Nothing to block. |
 | `web/rag-browser` | `apify/rag-web-browser` | Search the web and get the top results as Markdown in one call. Tries Brave, then DuckDuckGo. |
 | `maps/google-maps` | `compass/crawler-google-places` | Local businesses with rating, category, address and phone. Drives a real browser — the slowest and most fragile Actor here. |
+| `linkedin/jobs` | LinkedIn scrapers | **Gated.** Job listings. Requires a burner-account cookie; see below. |
+
+### linkedin/jobs
+
+Disabled unless `LINKEDIN_BURNER_COOKIE` is set. It stays visible in
+`search-actors` while gated, with the reason attached, so an agent can tell you
+what to configure instead of reporting a missing tool.
+
+**Use a throwaway account.** LinkedIn restricts accounts it detects scraping,
+and losing your real profile in the middle of a job search is a bad trade for a
+list of postings. Two limits are enforced in code rather than asked for politely:
+
+- **80 requests per UTC day**, shared across every run and persisted to a
+  key-value store, so separate calls cannot quietly add up to a ban.
+- **Randomized 3–8 second delays**, because a machine-regular request rhythm is
+  itself a detection signal.
+
+The gate, the budget accounting and the credential-failure path are tested. The
+extraction itself is **not** verified against live LinkedIn — that needs a burner
+account, which development did not have. Treat the parsing as untested until you
+run it.
 
 ### ats-boards
 

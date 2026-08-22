@@ -23,6 +23,12 @@ export interface ActorManifest {
     /** Absolute path to the Actor's directory. */
     dir: string;
     /**
+     * Environment variables the Actor cannot run without. Declared in
+     * actor.json so the gate is visible to discovery rather than buried in the
+     * Actor's own code — an agent can see *why* it cannot run something.
+     */
+    requiresEnv?: string[];
+    /**
      * Set when the Actor refuses to run without configuration (e.g. a burner
      * cookie). Discovery still lists it; `call-actor` reports this instead of
      * running. Keeps gated Actors visible without making them callable.

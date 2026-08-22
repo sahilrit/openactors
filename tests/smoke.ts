@@ -211,6 +211,16 @@ check('contact details extracted for most listings',
     (maps.items ?? []).filter((b: any) => b.phone).length >= Math.ceil((maps.items ?? []).length / 2),
     `${(maps.items ?? []).filter((b: any) => b.phone).length}/${(maps.items ?? []).length} have phones`);
 
+// --- gated Actors ----------------------------------------------------------
+const gated = payload(await client.callTool({ name: 'fetch-actor-details', arguments: { actor: 'linkedin/jobs' } }));
+check('gated Actor is discoverable', gated.name === 'linkedin/jobs');
+check('gated Actor reports itself unrunnable', gated.runnable === false && /LINKEDIN_BURNER_COOKIE/.test(gated.gatedReason ?? ''),
+    gated.gatedReason);
+
+const blocked = await client.callTool({ name: 'call-actor', arguments: { actor: 'linkedin/jobs', input: { keywords: 'x' } } });
+check('gated Actor refuses to run', blocked.isError === true &&
+    /LINKEDIN_BURNER_COOKIE/.test(String((blocked as any).content[0].text)));
+
 await client.close();
 console.log(`\n${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);
