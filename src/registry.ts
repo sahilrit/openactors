@@ -111,3 +111,32 @@ export async function loadActorRunFn(manifest: ActorManifest): Promise<ActorRunF
     }
     return run as ActorRunFn;
 }
+
+/**
+ * The live view of what's installed. Refreshed on each discovery call so an
+ * Actor added while the server is running is picked up without a restart —
+ * the alternative is a confusing "no such Actor" for a directory that plainly
+ * exists on disk.
+ */
+export class ActorIndex {
+    private actors: ActorManifest[] = [];
+
+    async refresh(): Promise<ActorManifest[]> {
+        this.actors = await discoverActors();
+        return this.actors;
+    }
+
+    all(): ActorManifest[] {
+        return this.actors;
+    }
+
+    names(): string {
+        return this.actors.map((a) => a.name).join(', ');
+    }
+
+    /** Resolves aliases and the `~` separator Apify uses in some clients. */
+    find(requested: string, resolve: (name: string) => string): ActorManifest | undefined {
+        const name = resolve(requested);
+        return this.actors.find((a) => a.name === name);
+    }
+}

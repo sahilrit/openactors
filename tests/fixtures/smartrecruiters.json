@@ -1,0 +1,80 @@
+{
+  "id": "744000143115219",
+  "name": "Senior Information Security Engineer",
+  "uuid": "f14d00ce-bfd2-4ebf-8a01-c8e0fa636a49",
+  "jobAdId": "6f7661db-986b-45a9-be40-859cf4f2b78a",
+  "defaultJobAd": true,
+  "refNumber": "REF2010Z",
+  "company": {
+    "identifier": "smartrecruiters",
+    "name": "SmartRecruiters Inc"
+  },
+  "releasedDate": "2026-08-12T14:04:56.128Z",
+  "location": {
+    "city": "Poland",
+    "region": "REMOTE",
+    "country": "pl",
+    "remote": true,
+    "hybrid": false,
+    "fullLocation": "Poland, REMOTE, Poland"
+  },
+  "industry": {
+    "id": "computer_software",
+    "label": "Computer Software"
+  },
+  "department": {
+    "id": "5408693",
+    "label": "Engineering"
+  },
+  "function": {
+    "id": "engineering",
+    "label": "Engineering"
+  },
+  "typeOfEmployment": {
+    "id": "permanent",
+    "label": "Full-time"
+  },
+  "experienceLevel": {
+    "id": "mid_senior_level",
+    "label": "Mid-Senior Level"
+  },
+  "customField": [
+    {
+      "fieldId": "58b7e4d6e4b0885c92cd98ee",
+      "fieldLabel": "Department",
+      "valueId": "5408693",
+      "valueLabel": "Engineering"
+    },
+    {
+      "fieldId": "COUNTRY",
+      "fieldLabel": "Country/Region",
+      "valueId": "pl",
+      "valueLabel": "Poland"
+    },
+    {
+      "fieldId": "58b7e4d6e4b0885c92cd98eb",
+      "fieldLabel": "Brands",
+      "valueId": "default",
+      "valueLabel": "SmartRecruiters Inc"
+    },
+    {
+      "fieldId": "617043f52193e5503b7715c3",
+      "fieldLabel": "SR Cost Center",
+      "valueId": "ce24a0a5-2e30-41fb-a710-d0c7aecf89d3",
+      "valueLabel": "4.08 R&D Security"
+    },
+    {
+      "fieldId": "627035b6330a2b4d25aa0882",
+      "fieldLabel": "Career Site Department Labels",
+      "valueId": "ff7b8056-0f7d-4647-aee0-6207b0c564e5",
+      "valueLabel": "Engineering"
+    }
+  ],
+  "visibility": "PUBLIC",
+  "ref": "https://api.smartrecruiters.com/v1/companies/smartrecruiters/postings/744000143115219",
+  "language": {
+    "code": "en",
+    "label": "English",
+    "labelNative": "English (US)"
+  }
+}

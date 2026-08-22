@@ -34,10 +34,12 @@ await client.connect(
 
 const { tools } = await client.listTools();
 const names = tools.map((t) => t.name).sort();
-check('tools registered', names.length === 4, names.join(', '));
+check('tools registered', names.length === 11, `${names.length}: ${names.join(', ')}`);
 check(
     'Apify-compatible tool names',
-    ['call-actor', 'fetch-actor-details', 'get-dataset-items', 'search-actors'].every((n) => names.includes(n)),
+    ['call-actor', 'fetch-actor-details', 'get-dataset-items', 'search-actors', 'get-actor-run',
+     'get-actor-log', 'abort-actor-run', 'get-dataset', 'get-dataset-schema',
+     'get-key-value-store-record', 'get-actor-run-list'].every((n) => names.includes(n)),
 );
 
 const search = payload(await client.callTool({ name: 'search-actors', arguments: { search: 'markdown crawl' } }));
@@ -104,6 +106,69 @@ const multi = payload(
 check('follows links to more pages', multi.itemCount >= 2, `itemCount=${multi.itemCount}`);
 check('depth is tracked', (multi.items ?? []).some((i: any) => i.depth === 1),
     JSON.stringify((multi.items ?? []).map((i: any) => i.depth)));
+
+// --- run tools -------------------------------------------------------------
+const runInfo = payload(await client.callTool({ name: 'get-actor-run', arguments: { runId: run.runId } }));
+check('get-actor-run returns the run', runInfo.id === run.runId && runInfo.status === 'SUCCEEDED', runInfo.status);
+
+const runLog = payload(await client.callTool({ name: 'get-actor-log', arguments: { runId: run.runId } }));
+check('get-actor-log returns output', typeof runLog === 'string' && runLog.includes('crawled'), String(runLog).slice(0, 60));
+
+const runList = payload(await client.callTool({ name: 'get-actor-run-list', arguments: {} }));
+check('get-actor-run-list lists runs', runList.total >= 3, `total=${runList.total}`);
+
+const badRun = await client.callTool({ name: 'get-actor-run', arguments: { runId: 'run-does-not-exist' } });
+check('unknown run fails clearly', badRun.isError === true);
+
+// --- storage tools ---------------------------------------------------------
+const meta = payload(await client.callTool({ name: 'get-dataset', arguments: { datasetId: run.datasetId } }));
+check('get-dataset returns a count', meta.itemCount === 1, `itemCount=${meta.itemCount}`);
+
+const schema = payload(await client.callTool({ name: 'get-dataset-schema', arguments: { datasetId: run.datasetId } }));
+check('get-dataset-schema infers fields',
+    schema.schema?.properties?.markdown?.type === 'string' && schema.schema?.properties?.url?.type === 'string',
+    JSON.stringify(Object.keys(schema.schema?.properties ?? {})));
+
+// --- ats-boards ------------------------------------------------------------
+console.log('\n… fetching live ATS job boards\n');
+const jobs = payload(
+    await client.callTool({
+        name: 'call-actor',
+        arguments: {
+            actor: 'jobs/ats-boards',
+            input: {
+                boards: ['greenhouse:stripe', 'lever:leverdemo', 'ashby:ashby', 'nonsense:xyz'],
+                titleIncludes: ['marketing', 'growth'],
+            },
+            timeoutSecs: 180,
+        },
+    }),
+);
+check('ats-boards returns jobs', jobs.status === 'SUCCEEDED' && jobs.itemCount > 5, `${jobs.status} itemCount=${jobs.itemCount}`);
+check('jobs are normalized across providers',
+    new Set((jobs.items ?? []).map((j: any) => j.ats)).size >= 2,
+    JSON.stringify([...new Set((jobs.items ?? []).map((j: any) => j.ats))]));
+check('every job has a title and url',
+    (jobs.items ?? []).every((j: any) => j.title && /^https?:/.test(j.url)));
+check('descriptions omitted by default', (jobs.items ?? []).every((j: any) => j.description === null));
+
+const jobLog = payload(await client.callTool({ name: 'get-actor-log', arguments: { runId: jobs.runId } }));
+check('bad board is reported in the log, not fatal', String(jobLog).includes('SKIP "nonsense:xyz"'),
+    String(jobLog).split('\n').find((l: string) => l.includes('nonsense'))?.slice(0, 70));
+
+const remote = payload(
+    await client.callTool({
+        name: 'call-actor',
+        arguments: {
+            actor: 'jobs/ats-boards',
+            input: { boards: ['greenhouse:stripe'], titleIncludes: ['marketing'], remoteOnly: true },
+            timeoutSecs: 120,
+        },
+    }),
+);
+check('remoteOnly filters to remote roles',
+    remote.itemCount > 0 && (remote.items ?? []).every((j: any) => j.remote === true),
+    `itemCount=${remote.itemCount}`);
 
 await client.close();
 console.log(`\n${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);

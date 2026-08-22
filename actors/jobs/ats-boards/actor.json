@@ -1,0 +1,69 @@
+{
+  "title": "ATS Job Board Aggregator",
+  "description": "Fetches open roles directly from companies' applicant tracking systems (Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Recruitee) and returns them in one normalized shape. Uses each ATS's public no-auth JSON API, so there is no scraping, no rate-limit pain, and nothing to block. Filter by title keywords, remote status, and location. Boards are given as 'ats:account', e.g. 'greenhouse:stripe' or 'lever:leverdemo' \u2014 the account is the slug in the company's job board URL.",
+  "tags": [
+    "jobs",
+    "hiring",
+    "careers",
+    "ats",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "recruiting",
+    "job-search"
+  ],
+  "input": {
+    "type": "object",
+    "properties": {
+      "boards": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Boards to fetch, each as 'ats:account'. Valid ats values: greenhouse, lever, ashby, smartrecruiters, workable, recruitee. Example: [\"greenhouse:stripe\", \"ashby:ramp\"]."
+      },
+      "titleIncludes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Keep only roles whose title contains at least one of these (case-insensitive). Example: [\"marketing\", \"growth\", \"performance\"]."
+      },
+      "remoteOnly": {
+        "type": "boolean",
+        "description": "Keep only roles the ATS marks remote, or whose location mentions remote.",
+        "default": false
+      },
+      "locationIncludes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Keep only roles whose location contains one of these (case-insensitive)."
+      },
+      "includeDescription": {
+        "type": "boolean",
+        "description": "Include the job description. Off by default because descriptions are long and most searches only need titles and links. Note: for Greenhouse boards this flag also controls whether the `department` field is populated, because both come from the same underlying request.",
+        "default": false
+      },
+      "maxDescriptionChars": {
+        "type": "integer",
+        "description": "Truncate each description to this length.",
+        "default": 2000,
+        "minimum": 100,
+        "maximum": 20000
+      },
+      "maxPerBoard": {
+        "type": "integer",
+        "description": "Cap results taken from any single board, applied after filtering.",
+        "default": 200,
+        "minimum": 1,
+        "maximum": 1000
+      }
+    },
+    "required": [
+      "boards"
+    ],
+    "additionalProperties": false
+  }
+}

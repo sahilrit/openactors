@@ -55,13 +55,42 @@ lets the Actor count grow without bloating the tool list.
 | `search-actors` | Find an Actor by keyword |
 | `fetch-actor-details` | Read its input JSON Schema |
 | `call-actor` | Run it; returns a preview plus a `datasetId` |
+| `get-actor-run` / `get-actor-run-list` | Status and history of runs |
+| `get-actor-log` | Per-item failures that didn't fail the whole run |
+| `abort-actor-run` | Stop a run in progress; keeps what it collected |
 | `get-dataset-items` | Page through results, optionally projecting fields |
+| `get-dataset` / `get-dataset-schema` | Item count; inferred field shape |
+| `get-key-value-store-record` | Read a stored record by key |
+
+Tool results are capped at a character budget and tell you how to page for the
+rest, because a scraped page can be tens of thousands of characters and a tool
+result goes straight into the agent's context.
 
 ## Actors
 
 | Actor | Replaces | Notes |
 |---|---|---|
 | `web/site-crawler` | `apify/website-content-crawler` | Any site → clean Markdown. Boilerplate stripped via Readability. Runs from your own IP. |
+| `jobs/ats-boards` | paid ATS scrapers | Open roles straight from Greenhouse, Lever, Ashby, SmartRecruiters, Workable and Recruitee. **No scraping** — these are the public no-auth JSON APIs each ATS publishes so companies can embed listings. Nothing to block. |
+
+### ats-boards
+
+Boards are given as `ats:account`, where the account is the slug in the
+company's job-board URL:
+
+```json
+{
+  "boards": ["greenhouse:stripe", "lever:leverdemo", "ashby:ashby"],
+  "titleIncludes": ["marketing", "growth"],
+  "remoteOnly": true
+}
+```
+
+Greenhouse, Lever, Ashby and SmartRecruiters adapters are verified against live
+boards. Workable and Recruitee are written from their documented shapes but were
+never exercised against a populated board — every one reachable during
+development had zero open roles. They are marked `verified: false` in
+`providers.ts` and the run log says so when you use them.
 
 ## Writing an Actor
 
@@ -85,11 +114,18 @@ crawl nothing.
 
 ```bash
 npm run typecheck
-npx tsx tests/smoke.ts
+npm test              # normalizer unit tests, offline, against recorded fixtures
+npx tsx tests/smoke.ts  # end-to-end over real MCP stdio, hits the live network
 ```
 
-The smoke test drives the server over real MCP stdio and performs live crawls —
-it is the only thing that proves the wire contract and the scraping together.
+The unit tests cover the ATS normalizers — pure functions, and the thing most
+likely to break silently, since a renamed upstream field turns every title into
+`(untitled)` without raising anything.
+
+The smoke test drives the server over real MCP stdio and performs live crawls
+and live board fetches. It is the only thing that proves the wire contract and
+the network behaviour together, which is why it runs against the real internet
+rather than mocks.
 
 ## Limits, stated plainly
 
