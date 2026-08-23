@@ -313,15 +313,68 @@ changing an Actor** or the schedule keeps running the old code.
 
 ## Proxies
 
-Everything works from your own IP by default, which is what makes it free.
-`PROXY_URL` is the single seam for changing that:
+Everything works from your own IP by default, which is what makes it free. When
+a target starts blocking, this is the seam.
+
+**What this is and is not.** Residential IPs are rented from a provider; no
+amount of code produces them. What is software here is the *other* half of
+Apify Proxy — session stickiness, rotation, country targeting and ban handling —
+and that is what this implements, with the provider left pluggable.
+
+Simplest form, unchanged:
 
 ```bash
 PROXY_URL=http://user:pass@host:port
 ```
 
-It routes both HTTP requests and the browser. Nothing else needs to change —
-no Actor knows or cares whether a proxy is configured.
+For a residential gateway, `proxy.json` (or the `PROXY_*` variables):
+
+```json
+{
+  "mode": "gateway",
+  "preset": "iproyal",
+  "user": "your-account",
+  "password": "your-password",
+  "country": "US",
+  "sessionTtlSecs": 1800
+}
+```
+
+Presets exist for `apify`, `iproyal`, `oxylabs`, `dataimpulse` and `evomi`.
+Anything else works via a username template, because every vendor encodes the
+same three parameters differently:
+
+| Provider | Username shape |
+|---|---|
+| Apify | `groups-RESIDENTIAL,session-{session},country-{country}` |
+| IPRoyal | `{user}-country-{country}-session-{session}` |
+| Oxylabs | `customer-{user}-cc-{country}-sessid-{session}` |
+| DataImpulse | `{user}__cr.{country};sid.{session}` |
+
+`{session}`, `{country}` and `{user}` are substituted; a template whose
+placeholder is empty is cleaned up rather than left with stray separators that
+would break authentication.
+
+**Sessions are keyed on the run id**, so one run holds one address across all
+its requests. This matters more than raw rotation: a crawl that changes IP
+between pages looks *less* like a person, not more. Sessions expire after
+`sessionTtlSecs` (default 30 minutes, matching how residential pools recycle),
+and the same session drives both the exit IP and the generated browser
+fingerprint — a request arriving from a new address wearing the old fingerprint,
+or the reverse, is more distinctive than either change alone.
+
+A 403 or 429 counts a strike against the session; two retires it. One block can
+be bad luck, and discarding a working address for it burns the pool faster than
+the blocks do.
+
+`GET /health` reports whether a proxy is active, its mode, country and live
+session count — never the credentials.
+
+**Cost, so the trade is explicit:** residential bandwidth runs roughly
+$1–4/GB. Only `maps/google-maps` at volume and heavy crawling need it; the ATS
+job APIs, LinkedIn's public endpoint and ordinary site crawling do not.
+
+## Notes on fragility
 
 ## Notes on fragility
 

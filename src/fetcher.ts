@@ -1,6 +1,12 @@
-import { ProxyAgent } from 'undici';
+// undici's own fetch, not the global one. Node bundles a different undici
+// build internally, and handing the standalone package's ProxyAgent to the
+// global fetch fails with "invalid onRequestStart method" — the two versions
+// disagree about the dispatcher interface. Using one library for both sides
+// removes the mismatch entirely.
+import { ProxyAgent, fetch as undiciFetch } from 'undici';
 import { chromium, type Browser } from 'playwright';
 import { HeaderGenerator } from 'header-generator';
+import { getProxyConfiguration, type ProxyInfo } from './proxy.js';
 
 /**
  * Generates complete, internally consistent browser header sets.
@@ -46,17 +52,46 @@ export function rotateSession(session = 'default'): void {
 }
 
 /**
- * The single place a proxy is configured. Everything here works from your own
- * IP by default, which is free; targets that fingerprint hard (Google Maps at
- * volume, LinkedIn) need rotating residential addresses, and that must be a
- * config change rather than a rewrite of every Actor.
- *
- * Set PROXY_URL=http://user:pass@host:port to route both HTTP and browser
- * traffic through a proxy.
+ * Kept for the simplest case and for anything still reading it. Richer setups
+ * come from proxy.json or the PROXY_* variables; see src/proxy.ts.
  */
 export const PROXY_URL = process.env.PROXY_URL ?? null;
 
-const proxyAgent = PROXY_URL ? new ProxyAgent(PROXY_URL) : null;
+/**
+ * One dispatcher per distinct proxy URL.
+ *
+ * Building a ProxyAgent per request would open a fresh connection pool every
+ * time, which is slow and — because a new TLS handshake per request is itself
+ * anomalous — counterproductive for the thing proxies are used to avoid.
+ */
+const agents = new Map<string, ProxyAgent>();
+
+function agentFor(url: string): ProxyAgent {
+    const existing = agents.get(url);
+    if (existing) return existing;
+    const agent = new ProxyAgent(url);
+    agents.set(url, agent);
+    return agent;
+}
+
+/** Resolves the proxy for a session, or null when none is configured. */
+export async function proxyForSession(session: string): Promise<ProxyInfo | null> {
+    const configuration = await getProxyConfiguration();
+    return configuration?.newProxyInfo(session) ?? null;
+}
+
+/**
+ * Records that a session was blocked, so its address can be retired.
+ *
+ * Header identity and IP are retired together on purpose: a request that
+ * returns from a new address wearing the same browser fingerprint, or the
+ * reverse, is more distinctive than either change alone.
+ */
+export async function markSessionBlocked(session = 'default'): Promise<void> {
+    rotateSession(session);
+    const configuration = await getProxyConfiguration();
+    configuration?.markBad(session);
+}
 
 /** Serializes requests per host with a minimum gap between them. */
 export class RateLimiter {
@@ -110,23 +145,32 @@ export async function fetchText(url: string, options: FetchOptions = {}): Promis
         }
 
         try {
-            const res = await fetch(url, {
+            const proxy = await proxyForSession(session);
+            const res = await undiciFetch(url, {
                 signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
                 headers: { ...headersFor(session), ...headers },
-                ...(proxyAgent ? ({ dispatcher: proxyAgent } as Record<string, unknown>) : {}),
+                ...(proxy ? { dispatcher: agentFor(proxy.url) } : {}),
             });
 
             const retryable = res.status === 429 || res.status >= 500;
             if (!res.ok && retryable && attempt < retries) {
                 lastError = `HTTP ${res.status}`;
                 // A 429 or 403 means this identity is the problem, so retrying
-                // with the same headers repeats the request that just failed.
-                if (res.status === 429 || res.status === 403) rotateSession(session);
+                // unchanged just repeats the request that failed.
+                if (res.status === 429 || res.status === 403) await markSessionBlocked(session);
                 continue;
             }
+            // A block that is not retried still counts against the session, so
+            // the next caller does not inherit a burnt address.
+            if (res.status === 403 || res.status === 429) await markSessionBlocked(session);
             return { status: res.status, body: await res.text() };
         } catch (err) {
-            lastError = (err as Error).message;
+            // Node's fetch reports a bare "fetch failed" and puts the real
+            // reason — DNS, refused connection, TLS, proxy failure — in
+            // `cause`. Without unwrapping it, every network problem looks the
+            // same in a log.
+            const error = err as Error & { cause?: Error };
+            lastError = error.cause?.message ? `${error.message}: ${error.cause.message}` : error.message;
             if (signal?.aborted) throw err;
         }
     }
@@ -141,10 +185,24 @@ export async function fetchText(url: string, options: FetchOptions = {}): Promis
  * support macOS 12, which is what this runs on — driving the installed Chrome
  * is the supported path there, and it falls back to bundled Chromium elsewhere.
  */
-export async function launchBrowser(): Promise<Browser> {
+export async function launchBrowser(session = 'default'): Promise<Browser> {
+    const proxy = await proxyForSession(session);
+
+    // Playwright wants credentials separately from the server address, unlike
+    // undici which takes them inline.
+    let proxyOption: { server: string; username?: string; password?: string } | undefined;
+    if (proxy) {
+        const parsed = new URL(proxy.url);
+        proxyOption = {
+            server: `${parsed.protocol}//${parsed.host}`,
+            ...(parsed.username ? { username: decodeURIComponent(parsed.username) } : {}),
+            ...(parsed.password ? { password: decodeURIComponent(parsed.password) } : {}),
+        };
+    }
+
     const launchOptions = {
         headless: true,
-        ...(PROXY_URL ? { proxy: { server: PROXY_URL } } : {}),
+        ...(proxyOption ? { proxy: proxyOption } : {}),
     };
 
     try {

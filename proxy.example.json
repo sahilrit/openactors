@@ -1,0 +1,8 @@
+{
+  "mode": "gateway",
+  "preset": "iproyal",
+  "user": "your-account",
+  "password": "your-password",
+  "country": "US",
+  "sessionTtlSecs": 1800
+}

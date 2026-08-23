@@ -61,7 +61,7 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
     const { query, maxResults = 20, includeDetails = false, language = 'en' } = input;
     if (!query || query.trim() === '') throw new Error('query is required, e.g. "dentists in Austin, TX"');
 
-    const browser = await launchBrowser();
+    const browser = await launchBrowser(ctx.runId);
 
     try {
         const page = await browser.newPage({

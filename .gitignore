@@ -11,3 +11,4 @@ digests/
 searches.json
 logs/
 webhooks.json
+proxy.json

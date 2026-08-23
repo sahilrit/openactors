@@ -57,7 +57,7 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
         let body: string;
         let status: number;
         try {
-            ({ status, body } = await fetchText(searchUrl(input, start), { signal: ctx.signal }));
+            ({ status, body } = await fetchText(searchUrl(input, start), { signal: ctx.signal, session: ctx.runId }));
         } catch (err) {
             ctx.log(`stopping at start=${start}: ${(err as Error).message}`);
             break;

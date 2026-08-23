@@ -3,6 +3,7 @@ import { createServer as createHttpServer, type IncomingMessage, type ServerResp
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from './create-server.js';
 import { ActorIndex, discoverActors } from './registry.js';
+import { getProxyConfiguration } from './proxy.js';
 import { handleRest } from './rest.js';
 import { Runtime } from './runtime.js';
 import { configureStorage } from './storage.js';
@@ -32,8 +33,18 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 
     if (url.pathname === '/health') {
+        const proxies = await getProxyConfiguration();
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', actors: (await discoverActors()).map((a) => a.name) }));
+        res.end(
+            JSON.stringify({
+                status: 'ok',
+                actors: (await discoverActors()).map((a) => a.name),
+                // Enough to confirm a proxy is actually in use; never the
+                // credentials, which would otherwise leak from an endpoint
+                // that exists to be curl'd.
+                proxy: proxies?.enabled ? { enabled: true, ...proxies.stats() } : { enabled: false },
+            }),
+        );
         return;
     }
 

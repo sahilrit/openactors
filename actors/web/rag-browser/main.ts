@@ -103,7 +103,7 @@ async function search(query: string, limit: number, ctx: ActorContext): Promise<
         if (ctx.signal.aborted) break;
         try {
             await limiter.take(engine.host);
-            const { status, body } = await fetchText(engine.url(query), { signal: ctx.signal });
+            const { status, body } = await fetchText(engine.url(query), { signal: ctx.signal, session: ctx.runId });
             if (status !== 200) {
                 problems.push(`${engine.name}: HTTP ${status}`);
                 continue;
@@ -155,7 +155,7 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
             const host = new URL(target.url).hostname;
             await limiter.take(host);
 
-            const { status, body } = await fetchText(target.url, { signal: ctx.signal });
+            const { status, body } = await fetchText(target.url, { signal: ctx.signal, session: ctx.runId });
             if (status !== 200) {
                 ctx.log(`SKIP ${target.url} — HTTP ${status}`);
                 continue;

@@ -1,5 +1,6 @@
 import { CheerioCrawler } from '@crawlee/cheerio';
-import { RequestQueue } from '@crawlee/core';
+import { ProxyConfiguration, RequestQueue } from '@crawlee/core';
+import { getProxyConfiguration } from '../../../src/proxy.js';
 import { htmlToMarkdown } from '../../../src/extract.js';
 import type { ActorContext } from '../../../src/types.js';
 
@@ -33,8 +34,19 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
     // URLs as already handled and return nothing.
     const requestQueue = await RequestQueue.open(`${ctx.runId}-requests`);
 
+    // Crawlee drives its own session pool, so it asks for a URL per session
+    // rather than being handed a fixed one. Keying on the run id means a crawl
+    // holds one address across its pages instead of hopping per request.
+    const proxies = await getProxyConfiguration();
+    const proxyConfiguration = proxies?.enabled
+        ? new ProxyConfiguration({
+              newUrlFunction: (sessionId) => proxies.newUrl(`${ctx.runId}-${sessionId ?? 'default'}`),
+          })
+        : undefined;
+
     const crawler = new CheerioCrawler({
         requestQueue,
+        proxyConfiguration,
         // Crawlee's session pool rotates identities and retires a session that
         // starts getting blocked, instead of hammering a target with one that
         // has already been flagged.
