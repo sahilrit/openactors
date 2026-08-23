@@ -102,6 +102,7 @@ createHttpServer((req, res) => {
     // started by a previous process or by the scheduler.
     await runtime.load();
     await index.refresh();
+    runtime.resolveActor = (name) => index.find(name, resolveActorName);
     scheduler.start();
     console.log(`[openactors] http listening on :${PORT} — MCP at /mcp, REST at /v2, health at /health`);
     if (!AUTH_TOKEN) {

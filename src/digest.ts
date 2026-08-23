@@ -58,6 +58,9 @@ async function main(): Promise<void> {
     const now = new Date();
     const runtime = new Runtime();
     await runtime.load();
+
+    const installed = await discoverActors();
+    runtime.resolveActor = (name) => installed.find((a) => a.name === resolveActorName(name));
     const state = await loadState();
 
     console.error(`[digest] ${config.searches.length} saved search(es) from ${path}`);

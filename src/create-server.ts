@@ -1,4 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { resolveActorName } from './aliases.js';
 import { ActorIndex } from './registry.js';
 import { Runtime } from './runtime.js';
 import { registerActorTools } from './tools/actors.js';
@@ -25,6 +26,10 @@ const INSTRUCTIONS =
 export async function createServer(runtime: Runtime): Promise<McpServer> {
     const index = new ActorIndex();
     await index.refresh();
+
+    // Lets an Actor call another. Injected here so the Runtime itself keeps no
+    // dependency on the registry.
+    runtime.resolveActor = (name) => index.find(name, resolveActorName);
 
     const server = new McpServer({ name: 'openactors', version: '0.1.0' }, { instructions: INSTRUCTIONS });
 

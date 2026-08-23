@@ -16,7 +16,18 @@ export type ParentMessage =
           runtime?: import('./types.js').ActorRuntime;
       }
     /** Ask the Actor to stop at its next checkpoint before it is killed outright. */
-    | { type: 'abort' };
+    | { type: 'abort' }
+    /** Result of a nested Actor call the child requested. */
+    | {
+          type: 'callResult';
+          callId: string;
+          ok: boolean;
+          error?: string;
+          runId?: string;
+          datasetId?: string;
+          status?: string;
+          itemCount?: number;
+      };
 
 export type ChildMessage =
     | { type: 'ready' }
@@ -24,4 +35,8 @@ export type ChildMessage =
     /** Incremental, not cumulative: the parent adds these up. */
     | { type: 'items'; count: number }
     | { type: 'done' }
-    | { type: 'error'; message: string };
+    | { type: 'error'; message: string }
+    /** Resource usage, reported by the child about itself. */
+    | { type: 'metrics'; peakMemoryMb: number; cpuMs: number }
+    /** The Actor is asking to run another Actor. */
+    | { type: 'call'; callId: string; actor: string; input: unknown };

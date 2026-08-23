@@ -32,6 +32,16 @@ export interface SpawnOptions {
     graceMs?: number;
     onLog(message: string): void;
     onItems(count: number): void;
+    onMetrics?(metrics: { peakMemoryMb: number; cpuMs: number }): void;
+    /** Services an Actor's request to run another Actor. */
+    onCall?(actor: string, input: unknown): Promise<{
+        ok: boolean;
+        error?: string;
+        runId?: string;
+        datasetId?: string;
+        status?: string;
+        itemCount?: number;
+    }>;
 }
 
 export interface SpawnHandle {
@@ -153,6 +163,29 @@ export function spawnActor(options: SpawnOptions): SpawnHandle {
                 case 'error':
                     reported = { outcome: 'error', message: message.message };
                     break;
+                case 'metrics':
+                    options.onMetrics?.({ peakMemoryMb: message.peakMemoryMb, cpuMs: message.cpuMs });
+                    break;
+                case 'call': {
+                    const respond = (payload: Omit<Extract<ParentMessage, { type: 'callResult' }>, 'type' | 'callId'>) => {
+                        // The child is blocked waiting; a failure to reply would
+                        // hang it until the timeout rather than surfacing an error.
+                        try {
+                            child.send({ type: 'callResult', callId: message.callId, ...payload });
+                        } catch {
+                            /* channel closed; the run is ending anyway */
+                        }
+                    };
+                    if (!options.onCall) {
+                        respond({ ok: false, error: 'nested Actor calls are not enabled here' });
+                        break;
+                    }
+                    void options
+                        .onCall(message.actor, message.input)
+                        .then(respond)
+                        .catch((err: Error) => respond({ ok: false, error: err.message }));
+                    break;
+                }
             }
         });
 

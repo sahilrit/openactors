@@ -399,6 +399,30 @@ session count — never the credentials.
 $1–4/GB. Only `maps/google-maps` at volume and heavy crawling need it; the ATS
 job APIs, LinkedIn's public endpoint and ordinary site crawling do not.
 
+## Composition and metrics
+
+An Actor can run another:
+
+```ts
+const nested = await ctx.call('jobs/ats-boards', { boards: ['ashby:linear'] });
+for (const job of nested.items) await ctx.pushData({ ...job, tagged: true });
+```
+
+The request goes back to the parent, so a nested run gets the same validation,
+isolation and limits as any other rather than a second execution path with its
+own rules. A nested run that does not succeed **throws** in the caller —
+returning it quietly would let an Actor build results on top of a run that
+produced nothing and report success for both. Nesting is capped at three levels.
+
+Nested runs are exempt from the concurrency limit by necessity: the caller is
+already holding a slot and waiting, so queueing the callee behind it would
+deadlock outright at a limit of one.
+
+Every run reports `peakMemoryMb`, `cpuMs` and `computeUnits` (gigabyte-hours,
+the unit Apify bills in — the honest measure of what a run cost to execute,
+whoever is paying). Memory is measured as RSS rather than heap, because the
+browser and parser buffers a crawl uses live outside the JS heap.
+
 ## Limits and housekeeping
 
 **Concurrency.** Runs are capped at `MAX_CONCURRENT_RUNS` (default: one less
@@ -416,6 +440,30 @@ defaults to a dry run, because a cleanup that deletes on first acquaintance is
 a trap.
 
 ## Notes on fragility
+
+## Composition and metrics
+
+An Actor can run another:
+
+```ts
+const nested = await ctx.call('jobs/ats-boards', { boards: ['ashby:linear'] });
+for (const job of nested.items) await ctx.pushData({ ...job, tagged: true });
+```
+
+The request goes back to the parent, so a nested run gets the same validation,
+isolation and limits as any other rather than a second execution path with its
+own rules. A nested run that does not succeed **throws** in the caller —
+returning it quietly would let an Actor build results on top of a run that
+produced nothing and report success for both. Nesting is capped at three levels.
+
+Nested runs are exempt from the concurrency limit by necessity: the caller is
+already holding a slot and waiting, so queueing the callee behind it would
+deadlock outright at a limit of one.
+
+Every run reports `peakMemoryMb`, `cpuMs` and `computeUnits` (gigabyte-hours,
+the unit Apify bills in — the honest measure of what a run cost to execute,
+whoever is paying). Memory is measured as RSS rather than heap, because the
+browser and parser buffers a crawl uses live outside the JS heap.
 
 ## Limits and housekeeping
 

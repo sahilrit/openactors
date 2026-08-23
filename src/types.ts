@@ -88,6 +88,15 @@ export interface RunRecord {
     finishedAt?: string;
     /** Wall-clock milliseconds, set once the run reaches a terminal state. */
     durationMs?: number;
+    /** Peak resident heap of the Actor process, as it measured itself. */
+    peakMemoryMb?: number;
+    /** CPU time consumed, user plus system. */
+    cpuMs?: number;
+    /**
+     * Gigabyte-hours, the unit Apify bills in. Kept because it is the honest
+     * measure of what a run cost to execute, whoever is paying.
+     */
+    computeUnits?: number;
     /** Name of the Crawlee Dataset holding this run's items. */
     defaultDatasetId: string;
     itemCount: number;
@@ -118,6 +127,23 @@ export interface ActorContext {
     pushData(item: Record<string, unknown> | Record<string, unknown>[]): Promise<void>;
     log(message: string): void;
     signal: AbortSignal;
+    /**
+     * Runs another Actor and waits for it.
+     *
+     * Composition without the Actor needing the server: the request goes back
+     * to the parent, which applies the same validation, concurrency limit and
+     * isolation as any other run. Returns the nested run's dataset so the
+     * caller can read its results.
+     */
+    call(actor: string, input?: Record<string, unknown>): Promise<NestedRunResult>;
+}
+
+export interface NestedRunResult {
+    runId: string;
+    datasetId: string;
+    status: string;
+    itemCount: number;
+    items: Record<string, unknown>[];
 }
 
 /** The single export every Actor's `main.ts` must provide. */

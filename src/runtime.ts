@@ -46,7 +46,18 @@ export interface CallOptions {
     resurrectedFrom?: string;
     /** Heap ceiling for the Actor process. */
     memoryMbytes?: number;
+    /**
+     * Set for a run started by another Actor. Such a run skips the concurrency
+     * limit, because its caller is already holding a slot and waiting for it —
+     * queueing it behind that slot would deadlock outright at a limit of one.
+     */
+    nested?: boolean;
+    /** Guards against an Actor chain spawning processes without end. */
+    depth?: number;
 }
+
+/** How deep Actor-calls-Actor may go before it is refused. */
+const MAX_CALL_DEPTH = 3;
 
 /** Maps a worker outcome onto the run state a caller sees. */
 const OUTCOME_STATUS: Record<SpawnOutcome, RunStatus> = {
@@ -69,10 +80,21 @@ const OUTCOME_STATUS: Record<SpawnOutcome, RunStatus> = {
 export class Runtime {
     private readonly runs = new Map<string, RunRecord>();
     private readonly handles = new Map<string, SpawnHandle>();
-    private readonly slots = new Semaphore(MAX_CONCURRENT);
+    private readonly slots: Semaphore;
     /** Runs cancelled while still queued, which have no process to signal yet. */
     private readonly cancelled = new Set<string>();
     private loaded = false;
+
+    /**
+     * Resolves an Actor by name, for nested calls. Injected rather than
+     * imported so the Runtime keeps no dependency on the registry.
+     */
+    resolveActor?: (name: string) => ActorManifest | undefined;
+
+    /** The limit is a parameter so it can be exercised directly, not only via the environment. */
+    constructor(maxConcurrent: number = MAX_CONCURRENT) {
+        this.slots = new Semaphore(Math.max(1, maxConcurrent));
+    }
 
     /** Live capacity, for diagnostics and the health endpoint. */
     capacity(): { limit: number; running: number; queued: number } {
@@ -183,7 +205,9 @@ export class Runtime {
         // READY is not decorative: the run exists and is waiting for a slot,
         // which is exactly what Apify's READY means. A caller polling it can
         // tell "queued" from "running" rather than seeing a silent stall.
-        const release = await this.slots.acquire();
+        // A nested run is covered by its caller's slot; taking another would
+        // deadlock whenever the limit is already reached.
+        const release = options.nested ? () => {} : await this.slots.acquire();
 
         // Cancelled while it waited: give the slot straight back.
         if (this.cancelled.delete(id)) {
@@ -216,6 +240,41 @@ export class Runtime {
             onItems: (count) => {
                 record.itemCount += count;
             },
+            onMetrics: ({ peakMemoryMb, cpuMs }) => {
+                record.peakMemoryMb = peakMemoryMb;
+                record.cpuMs = cpuMs;
+            },
+            onCall: async (actorName, nestedInput) => {
+                const depth = (options.depth ?? 0) + 1;
+                if (depth > MAX_CALL_DEPTH) {
+                    return { ok: false, error: `nested Actor calls may not exceed ${MAX_CALL_DEPTH} levels` };
+                }
+
+                const target = this.resolveActor?.(actorName);
+                if (!target) return { ok: false, error: `Actor "${actorName}" not found` };
+
+                try {
+                    const nested = await this.call(target, nestedInput, {
+                        origin: 'API',
+                        nested: true,
+                        depth,
+                        timeoutSecs: options.timeoutSecs,
+                    });
+                    record.log.push(`${new Date().toISOString()} called ${actorName} -> ${nested.status} (${nested.itemCount} items)`);
+                    return {
+                        ok: true,
+                        runId: nested.id,
+                        datasetId: nested.defaultDatasetId,
+                        status: nested.status,
+                        itemCount: nested.itemCount,
+                        // Carried so the caller's thrown error can say why the
+                        // nested run failed, not merely that it did.
+                        error: nested.errorMessage,
+                    };
+                } catch (err) {
+                    return { ok: false, error: (err as Error).message };
+                }
+            },
         });
         this.handles.set(id, handle);
 
@@ -234,6 +293,11 @@ export class Runtime {
             // The child counted what it actually wrote; trust that over the
             // parent's running tally, which a killed child can leave stale.
             record.itemCount = outcome.itemCount;
+
+            // Gigabyte-hours, the unit Apify bills in — the honest measure of
+            // what a run cost to execute, whoever is paying for it.
+            const gb = (options.memoryMbytes ?? 2048) / 1024;
+            record.computeUnits = Math.round(gb * ((Date.now() - startedAt) / 3_600_000) * 10_000) / 10_000;
         } finally {
             release();
             this.handles.delete(id);
