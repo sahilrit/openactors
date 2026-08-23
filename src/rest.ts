@@ -121,9 +121,12 @@ export async function handleRest(req: IncomingMessage, res: ServerResponse, deps
 
             const input = (await readBody(req)) as Record<string, unknown>;
             const timeoutSecs = parseIntParam(url.searchParams.get('timeout'), 300, 5, 3600);
+            const memoryMbytes = url.searchParams.has('memory')
+                ? parseIntParam(url.searchParams.get('memory'), 2048, 128, 16384)
+                : undefined;
 
             try {
-                const record = await runtime.call(actor, input, { timeoutSecs, origin: 'API' });
+                const record = await runtime.call(actor, input, { timeoutSecs, memoryMbytes, origin: 'API' });
                 // 201: a run resource was created, whatever its outcome.
                 json(res, 201, { data: record });
             } catch (err) {

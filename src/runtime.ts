@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { ActorContext, ActorManifest, RunRecord, RunStatus } from './types.js';
+import type { ActorManifest, RunRecord, RunStatus } from './types.js';
 import { isTerminal } from './types.js';
-import { loadActorRunFn } from './registry.js';
-import { openDataset, openKeyValueStore } from './storage.js';
+import { spawnActor, type SpawnHandle, type SpawnOutcome } from './spawn.js';
+import { openKeyValueStore } from './storage.js';
 import { validateInput } from './validate.js';
 import { emitRunEvent, type RunEvent } from './webhooks.js';
 
@@ -32,7 +32,18 @@ export interface CallOptions {
     timeoutSecs?: number;
     origin?: RunRecord['origin'];
     resurrectedFrom?: string;
+    /** Heap ceiling for the Actor process. */
+    memoryMbytes?: number;
 }
+
+/** Maps a worker outcome onto the run state a caller sees. */
+const OUTCOME_STATUS: Record<SpawnOutcome, RunStatus> = {
+    done: 'SUCCEEDED',
+    error: 'FAILED',
+    timeout: 'TIMED-OUT',
+    aborted: 'ABORTED',
+    crashed: 'FAILED',
+};
 
 /**
  * Tracks Actor runs.
@@ -45,7 +56,7 @@ export interface CallOptions {
  */
 export class Runtime {
     private readonly runs = new Map<string, RunRecord>();
-    private readonly controllers = new Map<string, AbortController>();
+    private readonly handles = new Map<string, SpawnHandle>();
     private loaded = false;
 
     /** Reads persisted history. Safe to call repeatedly; only the first reads. */
@@ -97,11 +108,11 @@ export class Runtime {
      */
     abort(runId: string): boolean {
         const record = this.runs.get(runId);
-        const controller = this.controllers.get(runId);
-        if (!record || !controller || controller.signal.aborted) return false;
+        const handle = this.handles.get(runId);
+        if (!record || !handle || isTerminal(record.status)) return false;
 
         record.status = 'ABORTING';
-        controller.abort();
+        handle.abort();
         return true;
     }
 
@@ -138,58 +149,44 @@ export class Runtime {
         this.runs.set(id, record);
         void this.emit('ACTOR.RUN.CREATED', record);
 
-        const dataset = await openDataset(id);
-        const controller = new AbortController();
-        this.controllers.set(id, controller);
-
-        const ctx: ActorContext = {
+        // The Actor runs in its own process. The parent never imports Actor
+        // code, so a crash, an out-of-memory kill, or a synchronous loop that
+        // no AbortController could interrupt ends the child alone rather than
+        // taking down the MCP server and the scheduler that depend on it.
+        const handle = spawnActor({
+            actorDir: manifest.dir,
+            actorName: manifest.name,
             runId: id,
-            pushData: async (item) => {
-                const items = Array.isArray(item) ? item : [item];
-                if (items.length === 0) return;
-                await dataset.pushData(items);
-                record.itemCount += items.length;
-            },
-            log: (message) => {
+            input,
+            timeoutMs: timeoutSecs * 1000,
+            memoryMb: options.memoryMbytes,
+            onLog: (message) => {
                 if (record.log.length >= MAX_LOG_LINES) record.log.shift();
                 record.log.push(`${new Date().toISOString()} ${message}`);
             },
-            signal: controller.signal,
-        };
-
-        // Distinguishes "the clock ran out" from "someone stopped it", which
-        // are different diagnoses and were previously reported identically.
-        let timedOut = false;
-        const timer = setTimeout(() => {
-            timedOut = true;
-            record.status = 'TIMING-OUT';
-            controller.abort();
-        }, timeoutSecs * 1000);
+            onItems: (count) => {
+                record.itemCount += count;
+            },
+        });
+        this.handles.set(id, handle);
 
         record.status = 'RUNNING';
 
         try {
-            const run = await loadActorRunFn(manifest);
-            await run(input, ctx);
+            const outcome = await handle.result;
+            record.status = OUTCOME_STATUS[outcome.outcome];
 
-            record.status = timedOut ? 'TIMED-OUT' : controller.signal.aborted ? 'ABORTED' : 'SUCCEEDED';
-            if (timedOut) record.errorMessage = `exceeded its ${timeoutSecs}s time limit`;
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            if (timedOut) {
-                record.status = 'TIMED-OUT';
-                record.errorMessage = `exceeded its ${timeoutSecs}s time limit: ${message}`;
-            } else if (controller.signal.aborted) {
-                record.status = 'ABORTED';
-                record.errorMessage = message;
-            } else {
-                record.status = 'FAILED';
-                record.errorMessage = message;
+            if (outcome.outcome === 'timeout') {
+                record.errorMessage = `exceeded its ${timeoutSecs}s time limit`;
+            } else if (outcome.message) {
+                record.errorMessage = outcome.message;
             }
-            ctx.log(`ERROR ${message}`);
+
+            // The child counted what it actually wrote; trust that over the
+            // parent's running tally, which a killed child can leave stale.
+            record.itemCount = outcome.itemCount;
         } finally {
-            clearTimeout(timer);
-            this.controllers.delete(id);
+            this.handles.delete(id);
             record.finishedAt = new Date().toISOString();
             record.durationMs = Date.now() - startedAt;
             await this.persist();

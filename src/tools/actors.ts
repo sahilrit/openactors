@@ -71,15 +71,22 @@ export function registerActorTools(server: McpServer, index: ActorIndex, runtime
                 actor: z.string().describe('Actor id, e.g. "jobs/ats-boards".'),
                 input: z.record(z.string(), z.unknown()).default({}).describe("The Actor's input object."),
                 timeoutSecs: z.number().int().min(5).max(900).default(120),
+                memoryMbytes: z
+                    .number()
+                    .int()
+                    .min(128)
+                    .max(16384)
+                    .optional()
+                    .describe('Heap ceiling for the Actor process. Raise it for a large crawl; a run that exceeds it is killed rather than exhausting the machine.'),
             },
         },
-        async ({ actor, input, timeoutSecs }) => {
+        async ({ actor, input, timeoutSecs, memoryMbytes }) => {
             const manifest = index.find(actor, resolveActorName);
             if (!manifest) return fail(`Actor "${actor}" not found. Available: ${index.names()}`);
 
             let record;
             try {
-                record = await runtime.call(manifest, input, { timeoutSecs, origin: 'MCP' });
+                record = await runtime.call(manifest, input, { timeoutSecs, memoryMbytes, origin: 'MCP' });
             } catch (err) {
                 // Input validation failures read as a list of specific problems
                 // rather than a stack trace, so an agent can correct the call

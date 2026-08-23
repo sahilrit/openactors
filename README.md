@@ -203,6 +203,38 @@ times with backoff, treats a non-429 4xx as a settled rejection rather than
 retrying it, and can never change a run's outcome: a dead endpoint is logged
 against the run and nothing more.
 
+## Process isolation
+
+Every Actor runs in its own child process. The server never imports Actor code.
+
+This is not defensive decoration. Scraper code drives browsers and parses
+hostile HTML, and three failure modes will otherwise take down the MCP server
+and the scheduler that depends on it:
+
+| Failure | In-process | Isolated |
+|---|---|---|
+| `process.exit()` or a segfault | Server dies | Run reports `FAILED`, items already written are kept |
+| Throw from a stray callback | Server dies | Run reports `FAILED` with the message |
+| Synchronous infinite loop | **Unrecoverable** | Killed at the timeout |
+| Runaway allocation | Machine memory exhausted | Killed at the heap ceiling |
+
+The infinite loop is the case that settles the design: a loop that never yields
+cannot be interrupted by an AbortController, a timer, or a promise rejection,
+because none of them ever get to run. Only killing the process works, and only
+a separate process can be killed.
+
+An abort asks the Actor to stop first — a cooperative Actor checking
+`ctx.signal` exits cleanly and keeps its results — and escalates to `SIGKILL`
+only after a grace period, since an Actor ignoring the abort is exactly the one
+a catchable signal will not stop either.
+
+`memoryMbytes` (MCP) and `?memory=` (REST) set the heap ceiling, default 2048.
+
+**The cost is about 420ms per run** for the fork and module load. That is real,
+and it is why this is worth stating rather than burying: for a crawl measured in
+seconds it is noise, and for a run-every-six-hours digest it is irrelevant. If
+you ever need thousands of tiny runs a minute, this is the trade to revisit.
+
 ## Anti-blocking
 
 Requests carry complete, internally consistent browser headers from Apify's own
