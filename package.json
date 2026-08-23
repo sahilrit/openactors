@@ -18,7 +18,9 @@
     "typecheck": "tsc --noEmit",
     "dev:http": "tsx src/http.ts",
     "start": "node dist/src/server.js",
-    "start:http": "node dist/src/http.js"
+    "start:http": "node dist/src/http.js",
+    "digest": "tsx src/digest.ts",
+    "digest:built": "node dist/src/digest.js"
   },
   "dependencies": {
     "@crawlee/cheerio": "^3.18.1",

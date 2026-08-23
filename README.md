@@ -136,6 +136,64 @@ Pages hold ten postings and consecutive offsets are disjoint, so paging advances
 by the number of cards received. Results are deduplicated by URL with tracking
 parameters stripped.
 
+## Daily digest
+
+Saved searches, run on a schedule, reporting only what you have not already
+seen. This is what turns the Actors from something you remember to run into
+something that works while you sleep.
+
+```bash
+cp searches.example.json searches.json   # then edit
+npm run digest
+```
+
+Each search names an Actor and its input:
+
+```json
+{
+  "searches": [{
+    "name": "Performance marketing in India, posted this week",
+    "actor": "linkedin/jobs",
+    "input": { "keywords": "performance marketing", "location": "India", "eligibleFrom": "IN" },
+    "display": ["title", "company", "location", "postedAt"]
+  }],
+  "output": { "dir": "digests", "keepDays": 90 }
+}
+```
+
+Output is written to `digests/YYYY-MM-DD.md` and `.html`, plus `latest.*`.
+
+Items are recognised by `url` (override with `key`), and a key is remembered for
+`keepDays` — comfortably longer than a posting stays listed, or an old role
+would fall out of memory and be reported as new again. An item with no usable
+key counts as new: showing a role twice is a smaller failure than never showing
+it. A search that fails is reported in the digest rather than taking the other
+searches down with it, and state is saved only after every search completes, so
+an interrupted run cannot mark items seen that were never reported.
+
+Renaming a search resets its history — names key the state.
+
+**On volume:** LinkedIn returns a rotating sample of a large corpus rather than
+the whole thing, so early runs surface a lot that is technically new to you. It
+settles as the seen-set fills. Narrowing `postedWithinDays` shrinks the corpus
+and settles it faster.
+
+## Scheduling
+
+```bash
+./scripts/schedule.sh install     # daily at 08:00; DIGEST_HOUR/DIGEST_MINUTE to change
+./scripts/schedule.sh status
+./scripts/schedule.sh run         # run once, exactly as the scheduler would
+./scripts/schedule.sh uninstall
+```
+
+launchd rather than cron: it survives reboots, needs no always-running process,
+and catches up a run missed because the Mac was asleep — which matters for a
+laptop that is not reliably awake at 08:00. Logs land in `logs/`.
+
+The agent runs the built `dist/` output, so **re-run `npm run build` after
+changing an Actor** or the schedule keeps running the old code.
+
 ## Proxies
 
 Everything works from your own IP by default, which is what makes it free.

@@ -1,0 +1,36 @@
+{
+  "searches": [
+    {
+      "name": "Performance marketing in India, posted this week",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "performance marketing",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 60
+      },
+      "display": ["title", "company", "location", "postedAt"]
+    },
+    {
+      "name": "Rare: globally-open growth roles at remote-first companies",
+      "actor": "jobs/ats-boards",
+      "input": {
+        "boards": [
+          "greenhouse:gitlab",
+          "greenhouse:webflow",
+          "greenhouse:cloudflare",
+          "ashby:linear",
+          "ashby:vanta",
+          "ashby:ramp",
+          "ashby:replit"
+        ],
+        "titleIncludes": ["performance marketing", "growth marketing", "paid media", "demand generation"],
+        "eligibleFrom": "IN"
+      },
+      "display": ["title", "account", "location", "eligibility", "publishedAt"]
+    }
+  ],
+  "output": { "dir": "digests", "keepDays": 90 }
+}

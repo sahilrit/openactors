@@ -1,28 +1,6 @@
-import { dirname, join, resolve } from 'node:path';
-import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { Configuration, Dataset, KeyValueStore } from '@crawlee/core';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-
-/**
- * Walks up to the directory holding package.json. Running from `src/` and from
- * a compiled `dist/src/` are different depths, and hardcoding one sends the
- * built server's storage to `dist/storage` while dev writes to `./storage` —
- * same server, two different sets of results.
- */
-function findProjectRoot(from: string): string {
-    let dir = from;
-    for (let i = 0; i < 5; i++) {
-        if (existsSync(join(dir, 'package.json'))) return dir;
-        const parent = dirname(dir);
-        if (parent === dir) break;
-        dir = parent;
-    }
-    return resolve(from, '..');
-}
-
-const PROJECT_ROOT = findProjectRoot(HERE);
+import { PROJECT_ROOT } from './paths.js';
 
 /**
  * Crawlee is Apify's own storage engine, MIT-licensed. We reuse Dataset and
