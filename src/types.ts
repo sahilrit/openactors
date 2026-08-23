@@ -29,9 +29,10 @@ export interface ActorManifest {
      */
     requiresEnv?: string[];
     /**
-     * Set when the Actor refuses to run without configuration (e.g. a burner
-     * cookie). Discovery still lists it; `call-actor` reports this instead of
-     * running. Keeps gated Actors visible without making them callable.
+     * Set when the Actor refuses to run without configuration (an API key, a
+     * session credential). Discovery still lists it; `call-actor` reports this
+     * instead of running, so an agent can say what needs configuring rather
+     * than reporting a missing tool.
      */
     gatedReason?: string;
 }

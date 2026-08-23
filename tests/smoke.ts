@@ -227,15 +227,38 @@ check('contact details extracted for most listings',
     (maps.items ?? []).filter((b: any) => b.phone).length >= Math.ceil((maps.items ?? []).length / 2),
     `${(maps.items ?? []).filter((b: any) => b.phone).length}/${(maps.items ?? []).length} have phones`);
 
-// --- gated Actors ----------------------------------------------------------
-const gated = payload(await client.callTool({ name: 'fetch-actor-details', arguments: { actor: 'linkedin/jobs' } }));
-check('gated Actor is discoverable', gated.name === 'linkedin/jobs');
-check('gated Actor reports itself unrunnable', gated.runnable === false && /LINKEDIN_BURNER_COOKIE/.test(gated.gatedReason ?? ''),
-    gated.gatedReason);
+// --- linkedin ---------------------------------------------------------------
+console.log('\n… linkedin public job search\n');
+const li = payload(
+    await client.callTool({
+        name: 'call-actor',
+        arguments: {
+            actor: 'linkedin/jobs',
+            input: { keywords: 'performance marketing', location: 'United Kingdom', postedWithinDays: 30, maxResults: 15 },
+            timeoutSecs: 300,
+        },
+    }),
+);
+check('linkedin runs with no credential', li.status === 'SUCCEEDED' && li.itemCount >= 10,
+    `${li.status} itemCount=${li.itemCount} ${li.error ?? ''}`);
+check('listings carry title, company and a job url',
+    (li.items ?? []).every((j: any) => j.title && j.company && /linkedin\.com\/jobs\/view\//.test(j.url)));
+check('urls are free of tracking params, so paging deduplicates',
+    (li.items ?? []).every((j: any) => !j.url.includes('?')) &&
+        new Set((li.items ?? []).map((j: any) => j.url)).size === (li.items ?? []).length);
+check('posted dates are ISO', (li.items ?? []).filter((j: any) => j.postedAt).every((j: any) => /^\d{4}-\d{2}-\d{2}T/.test(j.postedAt)));
 
-const blocked = await client.callTool({ name: 'call-actor', arguments: { actor: 'linkedin/jobs', input: { keywords: 'x' } } });
-check('gated Actor refuses to run', blocked.isError === true &&
-    /LINKEDIN_BURNER_COOKIE/.test(String((blocked as any).content[0].text)));
+const liLog = payload(await client.callTool({ name: 'get-actor-log', arguments: { runId: li.runId } }));
+// The second page must contribute new rows, not repeats — that is what proves
+// the offset advances correctly. The exact count varies because the run stops
+// at maxResults, so assert "more than zero", not a fixed number.
+const secondPage = String(liLog).split('\n').find((l) => l.includes('start=10:'));
+check('a second page contributes new listings rather than repeats',
+    /(\d+) new/.exec(secondPage ?? '')?.[1] !== undefined && Number(/(\d+) new/.exec(secondPage ?? '')![1]) > 0,
+    secondPage?.slice(24, 90));
+check('no duplicate listings across pages',
+    new Set((li.items ?? []).map((j: any) => j.id)).size === (li.items ?? []).length,
+    `${new Set((li.items ?? []).map((j: any) => j.id)).size} unique of ${(li.items ?? []).length}`);
 
 await client.close();
 console.log(`\n${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);

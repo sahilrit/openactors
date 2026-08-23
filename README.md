@@ -114,88 +114,27 @@ result goes straight into the agent's context.
 | `jobs/ats-boards` | paid ATS scrapers | Open roles straight from Greenhouse, Lever, Ashby, SmartRecruiters, Workable and Recruitee. **No scraping** — these are the public no-auth JSON APIs each ATS publishes so companies can embed listings. Nothing to block. |
 | `web/rag-browser` | `apify/rag-web-browser` | Search the web and get the top results as Markdown in one call. Tries Brave, then DuckDuckGo. |
 | `maps/google-maps` | `compass/crawler-google-places` | Local businesses with rating, category, address and phone. Drives a real browser — the slowest and most fragile Actor here. |
-| `linkedin/jobs` | LinkedIn scrapers | **Gated.** Job listings. Requires a burner-account cookie; see below. |
+| `linkedin/jobs` | LinkedIn scrapers | Job listings from LinkedIn's public endpoint. No account, no cookie, no browser. |
 
 ### linkedin/jobs
 
-Disabled unless `LINKEDIN_BURNER_COOKIE` is set. It stays visible in
-`search-actors` while gated, with the reason attached, so an agent can tell you
-what to configure instead of reporting a missing tool.
-
-**Use a throwaway account.** LinkedIn restricts accounts it detects scraping,
-and losing your real profile in the middle of a job search is a bad trade for a
-list of postings. Two limits are enforced in code rather than asked for politely:
-
-- **80 requests per UTC day**, shared across every run and persisted to a
-  key-value store, so separate calls cannot quietly add up to a ban.
-- **Randomized 3–8 second delays**, because a machine-regular request rhythm is
-  itself a detection signal.
-
-The gate, the budget accounting and the credential-failure path are tested. The
-extraction itself is **not** verified against live LinkedIn — that needs a burner
-account, which development did not have. Treat the parsing as untested until you
-run it.
-
-### ats-boards
-
-Boards are given as `ats:account`, where the account is the slug in the
-company's job-board URL:
+Uses the endpoint LinkedIn's own logged-out job search calls, so **no account,
+cookie or login is involved** and there is nothing that can be restricted. Plain
+HTTP, no browser, paced three seconds between pages.
 
 ```json
-{
-  "boards": ["greenhouse:stripe", "lever:leverdemo", "ashby:ashby"],
-  "titleIncludes": ["marketing", "growth"],
-  "remoteOnly": true
-}
+{ "keywords": "performance marketing", "location": "United Kingdom", "remoteOnly": true, "postedWithinDays": 30 }
 ```
 
-Results carry both `remote` (a strict boolean) and `workplaceType`
-(`Remote`/`Hybrid`/`OnSite` where the provider distinguishes them). `remoteOnly`
-is strict: hybrid is not remote. This matters more than it sounds — Ashby's own
-`isRemote` field is `true` for hybrid roles too, so Ramp's board reports 123
-"remote" postings of which only 16 actually are. The adapter ignores that field
-and reads `workplaceType` instead.
+Both filters were checked against live data rather than assumed: `f_TPR` is
+exact (a one-day window returns only today and yesterday; ninety days reaches
+back to July), and `f_WT` is real — remote and on-site result sets are
+near-disjoint. LinkedIn's own labelling is imperfect though, so an occasional
+listing whose title says on-site still comes through under `remoteOnly`.
 
-Greenhouse, Lever, Ashby, SmartRecruiters and Recruitee adapters are verified
-against live boards. Workable alone is written from its documented shape and
-never exercised against a populated board — every Workable account reachable
-during development had zero open roles. It is marked `verified: false` in
-`providers.ts`, and the run log says so when you use it.
-
-## Writing an Actor
-
-Create `actors/<namespace>/<name>/` with an `actor.json` (title, description,
-tags, and a JSON Schema for `input`) and a `main.ts` exporting:
-
-```ts
-export async function run(input: MyInput, ctx: ActorContext): Promise<void>
-```
-
-`ctx` gives you `pushData()`, `log()`, `signal`, and `runId`. That is the entire
-surface — an Actor never touches storage or MCP directly, so it can be tested on
-its own. New Actors are picked up on the next `search-actors` call without a
-restart.
-
-**If your Actor uses Crawlee storage, key it on `ctx.runId`.** Crawlee's default
-storages persist between runs, and reusing them makes the second run silently
-crawl nothing.
-
-## Testing
-
-```bash
-npm run typecheck
-npm test              # normalizer unit tests, offline, against recorded fixtures
-npx tsx tests/smoke.ts  # end-to-end over real MCP stdio, hits the live network
-```
-
-The unit tests cover the ATS normalizers — pure functions, and the thing most
-likely to break silently, since a renamed upstream field turns every title into
-`(untitled)` without raising anything.
-
-The smoke test drives the server over real MCP stdio and performs live crawls
-and live board fetches. It is the only thing that proves the wire contract and
-the network behaviour together, which is why it runs against the real internet
-rather than mocks.
+Pages hold ten postings and consecutive offsets are disjoint, so paging advances
+by the number of cards received. Results are deduplicated by URL with tracking
+parameters stripped.
 
 ## Proxies
 
@@ -253,13 +192,12 @@ LinkedIn gate refusing to run.
 **Unit tested:** the six ATS normalizers, the Google Maps card parser against
 captured real card text, and the LinkedIn daily budget.
 
-**Not verified:** `linkedin/jobs` extraction (needs a burner account this build
-did not have), the Workable adapter (no populated Workable board was reachable —
+**Not verified:** the Workable adapter (no populated Workable board was reachable —
 marked `verified: false` in `providers.ts`), and the Docker image (never built;
 the base tag was confirmed to exist upstream, nothing more).
 
-Note that the two real bugs found so far were both caught by *using* the tool,
-not by the test suite: a second crawl silently returning nothing, and hybrid
+Note that the real bugs found so far were caught by *using* the tool, not by the
+test suite: a second crawl silently returning nothing, and hybrid
 roles being reported as remote. The suite now covers both.
 
 ## License

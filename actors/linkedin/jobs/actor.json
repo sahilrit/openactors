@@ -1,8 +1,14 @@
 {
-  "title": "LinkedIn Job Search (burner account only)",
-  "description": "Searches LinkedIn job listings and returns title, company, location, posted date and link. REQUIRES a LinkedIn session cookie from a SEPARATE THROWAWAY ACCOUNT — never your real one. LinkedIn restricts accounts it detects scraping, and a restriction on your main account during a job search is expensive. Requests are hard-capped at 80 per UTC day across all runs, with randomized delays.",
-  "tags": ["linkedin", "jobs", "hiring", "careers", "search"],
-  "requiresEnv": ["LINKEDIN_BURNER_COOKIE"],
+  "title": "LinkedIn Job Search",
+  "description": "Searches LinkedIn job listings and returns title, company, location, posted date and a direct link. Uses LinkedIn's public job-search endpoint \u2014 the one its own logged-out site calls \u2014 so no account, cookie or login is involved and there is nothing that can be restricted. Filter by keywords, location, remote-only and how recently the role was posted.",
+  "tags": [
+    "linkedin",
+    "jobs",
+    "hiring",
+    "careers",
+    "search",
+    "job-search"
+  ],
   "input": {
     "type": "object",
     "properties": {
@@ -12,29 +18,32 @@
       },
       "location": {
         "type": "string",
-        "description": "Location filter, e.g. \"United Kingdom\" or \"Remote\"."
+        "description": "Location filter, e.g. \"United Kingdom\", \"India\", or \"Worldwide\". Note this is where the ROLE is based; use remoteOnly to find roles that can be done from elsewhere.",
+        "default": "Worldwide"
       },
       "remoteOnly": {
         "type": "boolean",
-        "description": "Restrict to roles LinkedIn labels remote.",
+        "description": "Restrict to roles LinkedIn labels remote. The filter is real \u2014 remote and on-site result sets are near-disjoint \u2014 but LinkedIn's own labelling is imperfect, so an occasional listing whose title says on-site still comes through.",
         "default": false
       },
       "postedWithinDays": {
         "type": "integer",
         "description": "Only roles posted within this many days.",
-        "default": 7,
+        "default": 30,
         "minimum": 1,
-        "maximum": 30
+        "maximum": 90
       },
       "maxResults": {
         "type": "integer",
-        "description": "Maximum listings to return. Also bounded by the 80-per-day cap shared across all runs.",
-        "default": 25,
+        "description": "Maximum listings to return. Each page of 25-30 is one request, paced a few seconds apart.",
+        "default": 50,
         "minimum": 1,
-        "maximum": 80
+        "maximum": 400
       }
     },
-    "required": ["keywords"],
+    "required": [
+      "keywords"
+    ],
     "additionalProperties": false
   }
 }

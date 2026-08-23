@@ -1,7 +1,6 @@
-import { launchBrowser } from '../../../src/fetcher.js';
-import { openKeyValueStore } from '../../../src/storage.js';
+import { RateLimiter, fetchText } from '../../../src/fetcher.js';
 import type { ActorContext } from '../../../src/types.js';
-import { DAILY_CEILING, nextDelayMs, remaining, rollover, type BudgetState } from './budget.js';
+import { parseCards } from './parse.js';
 
 interface Input {
     keywords: string;
@@ -11,144 +10,90 @@ interface Input {
     maxResults?: number;
 }
 
-/** Named store so the budget survives restarts and is shared by every run. */
-const BUDGET_STORE = 'linkedin-budget';
-const BUDGET_KEY = 'daily';
+const ENDPOINT = 'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search';
 
 /**
- * LinkedIn's own job-search page. `f_TPR=r<seconds>` is its posted-within
- * filter and `f_WT=2` its remote filter — both are the parameters the site's
- * own UI sets.
+ * Three seconds between pages. No account is at risk here, but this is still
+ * automated access to someone else's service, and LinkedIn answers a fast
+ * sequence with 429s.
  */
+const limiter = new RateLimiter(3000);
+
+/** Bounds the walk when LinkedIn keeps returning pages that add nothing new. */
+const MAX_BARREN_PAGES = 2;
+
 function searchUrl(input: Input, start: number): string {
-    const params = new URLSearchParams({ keywords: input.keywords, start: String(start) });
-    if (input.location) params.set('location', input.location);
+    const params = new URLSearchParams({
+        keywords: input.keywords,
+        location: input.location ?? 'Worldwide',
+        start: String(start),
+    });
+    // f_TPR and f_WT are the parameters LinkedIn's own filter UI sets.
     if (input.postedWithinDays) params.set('f_TPR', `r${input.postedWithinDays * 86_400}`);
     if (input.remoteOnly) params.set('f_WT', '2');
-    return `https://www.linkedin.com/jobs/search/?${params.toString()}`;
+    return `${ENDPOINT}?${params.toString()}`;
 }
 
 export async function run(input: Input, ctx: ActorContext): Promise<void> {
-    const cookie = process.env.LINKEDIN_BURNER_COOKIE;
-    if (!cookie) {
-        throw new Error(
-            'LINKEDIN_BURNER_COOKIE is not set. Use the li_at cookie of a SEPARATE THROWAWAY ' +
-                'LinkedIn account — never your main one. LinkedIn restricts accounts it detects scraping.',
-        );
-    }
+    const { keywords, maxResults = 50 } = input;
+    if (!keywords?.trim()) throw new Error('keywords is required, e.g. "performance marketing manager"');
 
-    const { keywords, maxResults = 25 } = input;
-    if (!keywords?.trim()) throw new Error('keywords is required');
+    const seen = new Set<string>();
+    let collected = 0;
+    let barren = 0;
+    let start = 0;
 
-    // Check the shared budget before opening a browser, so an exhausted day
-    // costs nothing and cannot be spent by accident.
-    const store = await openKeyValueStore(BUDGET_STORE);
-    const today = new Date().toISOString().slice(0, 10);
-    const budget: BudgetState = rollover((await store.getValue<BudgetState>(BUDGET_KEY)) ?? null, today);
-
-    const allowance = Math.min(maxResults, remaining(budget));
-    if (allowance <= 0) {
-        throw new Error(
-            `Daily LinkedIn budget exhausted (${budget.used}/${DAILY_CEILING} used on ${today}). ` +
-                'This cap exists to keep the account from being restricted; it resets at UTC midnight.',
-        );
-    }
-    if (allowance < maxResults) {
-        ctx.log(`budget limits this run to ${allowance} of ${maxResults} requested (${budget.used}/${DAILY_CEILING} used today)`);
-    }
-
-    const browser = await launchBrowser();
-
-    try {
-        const context = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
-        await context.addCookies([
-            { name: 'li_at', value: cookie, domain: '.linkedin.com', path: '/', httpOnly: true, secure: true },
-        ]);
-        const page = await context.newPage();
-
-        const seen = new Set<string>();
-        let collected = 0;
-        // LinkedIn pages job search results 25 at a time.
-        for (let start = 0; collected < allowance; start += 25) {
-            if (ctx.signal.aborted) break;
-
-            // Spend the budget before navigating, not after. A request that
-            // fails still reached LinkedIn, and the cap exists to protect the
-            // account rather than to count successes.
-            budget.used++;
-            await store.setValue(BUDGET_KEY, budget);
-
-            try {
-                await page.goto(searchUrl(input, start), { waitUntil: 'domcontentloaded', timeout: 45_000 });
-            } catch (err) {
-                // An invalid or expired cookie makes LinkedIn bounce between
-                // the login page and the destination until the browser gives
-                // up, so a redirect loop means bad credentials — not a network
-                // fault, and not something a retry would fix.
-                if (/ERR_TOO_MANY_REDIRECTS/.test((err as Error).message)) {
-                    throw new Error(
-                        'LinkedIn redirected in a loop, which means the burner cookie is expired or invalid. ' +
-                            'Log in as the burner account and copy a fresh li_at cookie into LINKEDIN_BURNER_COOKIE.',
-                    );
-                }
-                throw err;
-            }
-
-            if (page.url().includes('/authwall') || page.url().includes('/login')) {
-                throw new Error(
-                    'LinkedIn served a login wall — the burner cookie is expired or invalid. ' +
-                        'Copy a fresh li_at cookie into LINKEDIN_BURNER_COOKIE.',
-                );
-            }
-
-            const cards = await page
-                .locator('div.job-search-card, li div.base-card, [data-job-id]')
-                .evaluateAll((nodes) =>
-                    nodes.map((node) => ({
-                        text: (node as HTMLElement).innerText ?? '',
-                        href: node.querySelector('a[href*="/jobs/view/"]')?.getAttribute('href') ?? null,
-                        posted: node.querySelector('time')?.getAttribute('datetime') ?? null,
-                    })),
-                )
-                .catch(() => []);
-
-            if (cards.length === 0) {
-                ctx.log(`no listings parsed at start=${start}; stopping (LinkedIn may have changed its markup)`);
-                break;
-            }
-
-            let addedThisPage = 0;
-            for (const card of cards) {
-                if (collected >= allowance) break;
-                if (!card.href) continue;
-
-                const url = card.href.split('?')[0];
-                if (seen.has(url)) continue;
-                seen.add(url);
-
-                // Card text is "Title\nCompany\nLocation\n…" — read positionally
-                // but tolerate missing lines rather than shifting fields.
-                const lines = card.text.split('\n').map((l) => l.trim()).filter(Boolean);
-                await ctx.pushData({
-                    title: lines[0] ?? null,
-                    company: lines[1] ?? null,
-                    location: lines[2] ?? null,
-                    postedAt: card.posted,
-                    url,
-                    scrapedAt: new Date().toISOString(),
-                });
-                collected++;
-                addedThisPage++;
-            }
-
-            if (addedThisPage === 0) break; // no new listings; further pages repeat
-
-            // Jittered pause: a machine-regular request rhythm is itself a signal.
-            await page.waitForTimeout(nextDelayMs());
+    while (collected < maxResults && barren < MAX_BARREN_PAGES) {
+        if (ctx.signal.aborted) {
+            ctx.log('aborted; stopping');
+            return;
         }
 
-        ctx.log(`finished: ${collected} listing(s); budget now ${budget.used}/${DAILY_CEILING} for ${today}`);
-    } finally {
-        await browser.close().catch(() => {});
+        await limiter.take('www.linkedin.com');
+
+        let body: string;
+        let status: number;
+        try {
+            ({ status, body } = await fetchText(searchUrl(input, start), { signal: ctx.signal }));
+        } catch (err) {
+            ctx.log(`stopping at start=${start}: ${(err as Error).message}`);
+            break;
+        }
+
+        if (status === 429) {
+            ctx.log(`LinkedIn rate-limited this IP at start=${start}; stopping with ${collected} result(s)`);
+            break;
+        }
+        if (status !== 200) {
+            ctx.log(`stopping at start=${start}: HTTP ${status}`);
+            break;
+        }
+
+        const cards = parseCards(body);
+        if (cards.length === 0) {
+            // Either the result set is exhausted or the markup changed. Saying
+            // which is impossible from here, so say both.
+            ctx.log(`no cards at start=${start} — end of results, or LinkedIn changed its markup`);
+            break;
+        }
+
+        let added = 0;
+        for (const job of cards) {
+            if (collected >= maxResults) break;
+            if (seen.has(job.url)) continue;
+            seen.add(job.url);
+
+            await ctx.pushData({ ...job, scrapedAt: new Date().toISOString() });
+            collected++;
+            added++;
+        }
+
+        // Pages overlap: LinkedIn returns ~30 cards for a page size of 25, so
+        // advancing by what arrived keeps the walk from re-reading the seam.
+        start += cards.length;
+        barren = added === 0 ? barren + 1 : 0;
+        ctx.log(`start=${start - cards.length}: ${cards.length} card(s), ${added} new (total ${collected})`);
     }
+
+    ctx.log(`finished: ${collected} listing(s) for "${keywords}"`);
 }
