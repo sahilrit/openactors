@@ -103,7 +103,11 @@ async function main(): Promise<void> {
     const outDir = resolve(PROJECT_ROOT, config.output.dir);
     await mkdir(outDir, { recursive: true });
 
-    const stamp = now.toISOString().slice(0, 10);
+    // Timestamped to the minute, not just the date. A digest reports what is
+    // new *since the last run*, so on a sub-daily schedule two runs sharing a
+    // date-only filename would overwrite each other and the earlier run's
+    // results would be lost for good.
+    const stamp = `${now.toISOString().slice(0, 10)}-${now.toISOString().slice(11, 16).replace(':', '')}`;
     const written: string[] = [];
     for (const [name, body] of [
         [`${stamp}.md`, renderMarkdown(results, now)],

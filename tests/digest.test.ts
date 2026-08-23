@@ -58,19 +58,37 @@ describe('diff', () => {
 });
 
 describe('state shape', () => {
+    // Uses its own store. Writing to the live one erases real seen-history, and
+    // the only symptom is every reported item resurfacing as new next run.
+    const TEST_STORE = 'digest-state-vitest';
+
     it('reads the older bare-SeenMap shape without discarding history', async () => {
-        // Discarding it would report every already-known item as new again.
-        const { loadState, saveState } = await import('../src/digest/state.js');
+        const { loadState } = await import('../src/digest/state.js');
         const { configureStorage, openKeyValueStore } = await import('../src/storage.js');
         configureStorage();
-        const store = await openKeyValueStore('digest-state');
+
+        const store = await openKeyValueStore(TEST_STORE);
         await store.setValue('seen', { Legacy: { 'https://x.test/a': daysAgo(2) } });
 
-        const state = await loadState();
+        const state = await loadState(TEST_STORE);
         expect(state.Legacy.seen['https://x.test/a']).toBe(daysAgo(2));
         expect(state.Legacy.lastRunAt).toBeUndefined();
+    });
 
-        await store.setValue('seen', null);
+    it('round-trips the current shape', async () => {
+        const { loadState, saveState } = await import('../src/digest/state.js');
+        const { configureStorage } = await import('../src/storage.js');
+        configureStorage();
+
+        await saveState({ Current: { seen: { k: daysAgo(1) }, lastRunAt: daysAgo(1) } }, TEST_STORE);
+        const state = await loadState(TEST_STORE);
+        expect(state.Current.lastRunAt).toBe(daysAgo(1));
+        expect(state.Current.seen.k).toBe(daysAgo(1));
+    });
+
+    it('never touches the store the digest actually uses', async () => {
+        const { DEFAULT_STORE } = await import('../src/digest/state.js');
+        expect(TEST_STORE).not.toBe(DEFAULT_STORE);
     });
 });
 

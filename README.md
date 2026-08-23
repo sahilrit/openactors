@@ -161,7 +161,10 @@ Each search names an Actor and its input:
 }
 ```
 
-Output is written to `digests/YYYY-MM-DD.md` and `.html`, plus `latest.*`.
+Output is written to `digests/YYYY-MM-DD-HHMM.md` and `.html`, plus `latest.*`.
+Filenames carry the time, not just the date: a digest reports what is new *since
+the last run*, so on a sub-daily schedule two runs sharing a date-only name
+would overwrite each other and the earlier results would be lost.
 
 Items are recognised by `url` (override with `key`), and a key is remembered for
 `keepDays` — comfortably longer than a posting stays listed, or an old role
@@ -181,11 +184,16 @@ and settles it faster.
 ## Scheduling
 
 ```bash
-./scripts/schedule.sh install     # daily at 08:00; DIGEST_HOUR/DIGEST_MINUTE to change
+./scripts/schedule.sh install                      # daily at 08:00
+DIGEST_EVERY_HOURS=6 ./scripts/schedule.sh install # 00:00, 06:00, 12:00, 18:00
 ./scripts/schedule.sh status
-./scripts/schedule.sh run         # run once, exactly as the scheduler would
+./scripts/schedule.sh run                          # once, exactly as the scheduler would
 ./scripts/schedule.sh uninstall
 ```
+
+`DIGEST_EVERY_HOURS` must divide 24; `DIGEST_HOUR` and `DIGEST_MINUTE` offset
+the times. Sub-daily schedules use fixed clock times rather than an interval
+timer, which would drift and restart from zero on every reboot.
 
 launchd rather than cron: it survives reboots, needs no always-running process,
 and catches up a run missed because the Mac was asleep — which matters for a

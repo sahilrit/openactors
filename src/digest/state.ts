@@ -16,11 +16,17 @@ export interface SearchState {
 
 export type DigestState = Record<string, SearchState>;
 
-const STORE = 'digest-state';
+export const DEFAULT_STORE = 'digest-state';
 const KEY = 'seen';
 
-export async function loadState(): Promise<DigestState> {
-    const store = await openKeyValueStore(STORE);
+/**
+ * The store name is a parameter so tests can use their own. It is not merely
+ * tidiness: a test that writes to the live store erases real seen-history, and
+ * the only symptom is every already-reported item resurfacing as new in the
+ * next digest — which reads as a data problem, not a test problem.
+ */
+export async function loadState(storeName = DEFAULT_STORE): Promise<DigestState> {
+    const store = await openKeyValueStore(storeName);
     const raw = (await store.getValue<Record<string, unknown>>(KEY)) ?? {};
 
     // Earlier runs stored a bare SeenMap per search. Read both shapes so an
@@ -37,8 +43,8 @@ export async function loadState(): Promise<DigestState> {
     return state;
 }
 
-export async function saveState(state: DigestState): Promise<void> {
-    const store = await openKeyValueStore(STORE);
+export async function saveState(state: DigestState, storeName = DEFAULT_STORE): Promise<void> {
+    const store = await openKeyValueStore(storeName);
     await store.setValue(KEY, state);
 }
 
