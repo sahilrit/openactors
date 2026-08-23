@@ -12,3 +12,4 @@ searches.json
 logs/
 webhooks.json
 proxy.json
+.bin/

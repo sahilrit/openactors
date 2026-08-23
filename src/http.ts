@@ -4,7 +4,10 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createServer } from './create-server.js';
 import { ActorIndex, discoverActors } from './registry.js';
 import { consoleHtml } from './console.js';
+import { OpenActorsAuthProvider, type AuthSnapshot } from './oauth.js';
+import { createOAuthHandler } from './oauth-http.js';
 import { getProxyConfiguration } from './proxy.js';
+import { openKeyValueStore } from './storage.js';
 import { handleRest } from './rest.js';
 import { resolveActorName } from './aliases.js';
 import { Scheduler } from './schedules.js';
@@ -13,6 +16,38 @@ import { configureStorage } from './storage.js';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const AUTH_TOKEN = process.env.AUTH_TOKEN ?? null;
+
+/**
+ * Password for the OAuth consent screen. Its presence is what enables OAuth at
+ * all — without it there is nothing to prove ownership with, and auto-approving
+ * would let anyone who found the URL mint themselves a token.
+ */
+const OAUTH_PASSWORD = process.env.OAUTH_PASSWORD ?? null;
+
+/**
+ * Public origin this server is reachable at. A tunnel hands out a different
+ * hostname each time it starts, and OAuth metadata advertising the wrong one
+ * fails discovery in a way that looks like a client bug, so it is configured
+ * rather than guessed.
+ */
+const PUBLIC_URL = process.env.PUBLIC_URL?.replace(/\/$/, '') ?? null;
+
+const authProvider = OAUTH_PASSWORD
+    ? new OpenActorsAuthProvider({ password: OAUTH_PASSWORD, issuer: PUBLIC_URL ?? `http://localhost:${PORT}` })
+    : null;
+
+const AUTH_STORE = 'oauth';
+const AUTH_KEY = 'state';
+
+async function persistAuth(): Promise<void> {
+    if (!authProvider) return;
+    const store = await openKeyValueStore(AUTH_STORE);
+    await store.setValue(AUTH_KEY, authProvider.snapshot());
+}
+
+const oauthHandler = authProvider
+    ? createOAuthHandler(authProvider, () => PUBLIC_URL ?? `http://localhost:${PORT}`)
+    : null;
 
 /**
  * Remote transport, for running this somewhere other than the machine holding
@@ -33,8 +68,39 @@ const scheduler = new Scheduler({
 });
 
 function unauthorized(res: ServerResponse): void {
-    res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' });
+    // Pointing at the protected-resource metadata is what lets an MCP client
+    // discover how to authenticate instead of simply failing. Without this
+    // header Claude cannot start the OAuth flow.
+    const base = PUBLIC_URL ?? `http://localhost:${PORT}`;
+    const challenge = authProvider
+        ? `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`
+        : 'Bearer';
+
+    res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': challenge });
     res.end(JSON.stringify({ error: 'unauthorized' }));
+}
+
+/**
+ * Accepts either an OAuth access token or the static AUTH_TOKEN.
+ *
+ * Both exist because they serve different callers: Claude's connector can only
+ * do OAuth, while a script, a local MCP client or curl is far better served by
+ * a fixed token than by an authorization-code dance.
+ */
+async function authorized(req: IncomingMessage): Promise<boolean> {
+    if (!AUTH_TOKEN && !authProvider) return true;
+
+    const header = req.headers.authorization ?? '';
+    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    if (token === '') return false;
+
+    if (AUTH_TOKEN && token === AUTH_TOKEN) return true;
+    if (!authProvider) return false;
+
+    return authProvider
+        .verifyAccessToken(token)
+        .then(() => true)
+        .catch(() => false);
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -65,11 +131,17 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         return;
     }
 
+    // OAuth discovery, registration and consent must be reachable without a
+    // token — they are how a client obtains one.
+    if (oauthHandler && (await oauthHandler(req, res))) {
+        await persistAuth();
+        return;
+    }
+
     // This server can run arbitrary scrapers, so it must not be left open when
-    // exposed beyond localhost. AUTH_TOKEN is optional to keep local use
-    // frictionless, and the startup log warns loudly when it is unset. Checked
-    // before routing so REST and MCP are equally protected.
-    if (AUTH_TOKEN && req.headers.authorization !== `Bearer ${AUTH_TOKEN}`) {
+    // exposed beyond localhost. Checked before routing, so REST and MCP are
+    // equally protected.
+    if (!(await authorized(req))) {
         unauthorized(res);
         return;
     }
@@ -113,8 +185,22 @@ createHttpServer((req, res) => {
     await index.refresh();
     runtime.resolveActor = (name) => index.find(name, resolveActorName);
     scheduler.start();
+
+    if (authProvider) {
+        const store = await openKeyValueStore(AUTH_STORE);
+        // Restoring means a restart does not invalidate Claude's registration
+        // and token, which would otherwise force re-adding the connector.
+        authProvider.restore(await store.getValue<AuthSnapshot>(AUTH_KEY));
+    }
+
     console.log(`[openactors] http listening on :${PORT} — MCP at /mcp, REST at /v2, health at /health`);
-    if (!AUTH_TOKEN) {
-        console.warn('[openactors] WARNING: AUTH_TOKEN is not set. Do not expose this port beyond localhost.');
+    if (authProvider) {
+        console.log(`[openactors] OAuth enabled; public origin ${PUBLIC_URL ?? `http://localhost:${PORT}`}`);
+        if (!PUBLIC_URL) {
+            console.warn('[openactors] WARNING: PUBLIC_URL is unset. A remote client will be sent to localhost and fail.');
+        }
+    }
+    if (!AUTH_TOKEN && !authProvider) {
+        console.warn('[openactors] WARNING: no AUTH_TOKEN or OAUTH_PASSWORD. Do not expose this port beyond localhost.');
     }
 });

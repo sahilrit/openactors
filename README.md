@@ -152,6 +152,36 @@ default for a tool that runs scrapers on your own machine. The page itself is
 served unauthenticated; every request it makes carries the token, so it reveals
 nothing without one.
 
+## Connecting Claude (OAuth + tunnel)
+
+Claude's connector reaches your server **from Anthropic's cloud, not from your
+machine**, so `localhost` is invisible to it and a local stdio server cannot be
+used. It also speaks only OAuth — its UI has no field for a static token. Both
+gaps are covered:
+
+```bash
+scripts/install-tunnel.sh                        # once
+OAUTH_PASSWORD='something-long' scripts/tunnel.sh
+```
+
+That prints a public HTTPS URL. Paste `<url>/mcp` into Claude as a custom
+connector; Claude discovers the OAuth endpoints, registers itself, and sends you
+to a consent page that asks for `OAUTH_PASSWORD`.
+
+The consent step is not ceremony. Auto-approving would let anyone who found the
+URL complete the flow and mint a token for a server that runs arbitrary
+scrapers on your machine. For the same reason, the launcher **refuses to open a
+tunnel if something is already listening on the port** — it would otherwise
+publish that other server, which may have no authentication at all.
+
+Tokens and client registrations survive a restart, so restarting the server does
+not force you to re-add the connector.
+
+**A DNS caveat worth knowing:** some ISP resolvers return NXDOMAIN for
+`*.trycloudflare.com`. Claude is unaffected — it resolves through its own DNS —
+but *your* browser may not open the consent page. Point your Mac at 1.1.1.1 or
+8.8.8.8 (System Settings → Network → DNS) if that happens.
+
 ## REST API
 
 Paths mirror Apify's, including its `~` separator for namespaced Actor ids — a
