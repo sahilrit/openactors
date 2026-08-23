@@ -31,6 +31,9 @@ export interface NormalizedJob {
     employmentType: string | null;
     publishedAt: string | null;
     description: string | null;
+    /** Set only when the caller passes `eligibleFrom`. */
+    eligibility?: 'open' | 'restricted' | 'unknown';
+    eligibilityReason?: string;
 }
 
 export interface Provider {

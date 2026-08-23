@@ -1,3 +1,4 @@
+import { classifyEligibility } from '../../../src/geo.js';
 import type { ActorContext } from '../../../src/types.js';
 import { PROVIDERS, PROVIDER_NAMES, type NormalizedJob } from './providers.js';
 
@@ -9,6 +10,8 @@ interface Input {
     includeDescription?: boolean;
     maxDescriptionChars?: number;
     maxPerBoard?: number;
+    eligibleFrom?: string;
+    includeUnknownEligibility?: boolean;
 }
 
 const FETCH_TIMEOUT_MS = 25_000;
@@ -29,6 +32,8 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
         includeDescription = false,
         maxDescriptionChars = 2000,
         maxPerBoard = 200,
+        eligibleFrom,
+        includeUnknownEligibility = true,
     } = input;
 
     if (!Array.isArray(boards) || boards.length === 0) {
@@ -99,6 +104,17 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
             if (!matchesAny(job.title, titleIncludes)) continue;
             if (!matchesAny(job.location, locationIncludes)) continue;
             if (remoteOnly && job.remote !== true) continue;
+
+            if (eligibleFrom) {
+                const verdict = classifyEligibility(job.location, eligibleFrom, job.workplaceType);
+                // Unknown is kept by default. Most postings say only "Remote"
+                // with the restriction, if any, buried in the description —
+                // dropping them silently would hide real opportunities.
+                if (verdict.eligibility === 'restricted') continue;
+                if (verdict.eligibility === 'unknown' && !includeUnknownEligibility) continue;
+                job.eligibility = verdict.eligibility;
+                job.eligibilityReason = verdict.reason;
+            }
 
             if (!includeDescription) {
                 job.description = null;

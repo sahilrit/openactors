@@ -39,6 +39,15 @@
         "default": 50,
         "minimum": 1,
         "maximum": 400
+      },
+      "eligibleFrom": {
+        "type": "string",
+        "description": "ISO-3166 alpha-2 country code of the candidate, e.g. \"IN\" for India. When set, roles whose location is limited to other countries or regions are dropped, and each result gains `eligibility` (open/restricted/unknown) with a reason. Use this when \"remote\" is not enough \u2014 a \"Remote U.S.\" role is remote and still closed to someone without US work authorisation."
+      },
+      "includeUnknownEligibility": {
+        "type": "boolean",
+        "description": "Keep roles whose location gives no region at all (a bare \"Remote\"). On by default: these are the largest group and any restriction is usually buried in the description, so dropping them hides real opportunities. Set false for a stricter, shorter list.",
+        "default": true
       }
     },
     "required": [

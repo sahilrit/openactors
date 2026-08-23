@@ -260,6 +260,47 @@ check('no duplicate listings across pages',
     new Set((li.items ?? []).map((j: any) => j.id)).size === (li.items ?? []).length,
     `${new Set((li.items ?? []).map((j: any) => j.id)).size} unique of ${(li.items ?? []).length}`);
 
+// --- geographic eligibility -------------------------------------------------
+console.log('\n… geographic eligibility filter\n');
+const BOARDS = ['greenhouse:gitlab', 'greenhouse:webflow', 'ashby:linear'];
+const KW = ['growth', 'marketing', 'demand generation'];
+
+async function boardRun(extra: Record<string, unknown>) {
+    const res = payload(
+        await client.callTool({
+            name: 'call-actor',
+            arguments: { actor: 'jobs/ats-boards', input: { boards: BOARDS, titleIncludes: KW, ...extra }, timeoutSecs: 240 },
+        }),
+    );
+    const items = payload(
+        await client.callTool({
+            name: 'get-dataset-items',
+            arguments: { datasetId: res.datasetId, limit: 200, fields: ['title', 'location', 'eligibility', 'eligibilityReason'] },
+        }),
+    );
+    return items.items ?? [];
+}
+
+const unfiltered = await boardRun({ remoteOnly: true });
+const forIndia = await boardRun({ remoteOnly: true, eligibleFrom: 'IN' });
+const forUs = await boardRun({ remoteOnly: true, eligibleFrom: 'US' });
+
+check('eligibility filter narrows the list', forIndia.length < unfiltered.length,
+    `${unfiltered.length} remote -> ${forIndia.length} open from IN`);
+check('nothing restricted survives the filter',
+    forIndia.every((j: any) => j.eligibility !== 'restricted'),
+    JSON.stringify([...new Set(forIndia.map((j: any) => j.eligibility))]));
+check('every surviving row explains itself',
+    forIndia.every((j: any) => typeof j.eligibilityReason === 'string' && j.eligibilityReason.length > 0));
+
+// The filter must depend on the candidate's country, not merely reject
+// everything: these US-remote roles are closed to India and open to the US.
+check('the same roles resolve differently by country', forUs.length > forIndia.length,
+    `IN=${forIndia.length} US=${forUs.length}`);
+check('US-remote roles are open to a US candidate',
+    forUs.some((j: any) => j.eligibility === 'open'),
+    JSON.stringify(forUs.slice(0, 1).map((j: any) => [j.location, j.eligibility])));
+
 await client.close();
 console.log(`\n${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures === 0 ? 0 : 1);

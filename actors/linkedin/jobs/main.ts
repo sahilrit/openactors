@@ -1,3 +1,4 @@
+import { classifyEligibility } from '../../../src/geo.js';
 import { RateLimiter, fetchText } from '../../../src/fetcher.js';
 import type { ActorContext } from '../../../src/types.js';
 import { parseCards } from './parse.js';
@@ -8,6 +9,8 @@ interface Input {
     remoteOnly?: boolean;
     postedWithinDays?: number;
     maxResults?: number;
+    eligibleFrom?: string;
+    includeUnknownEligibility?: boolean;
 }
 
 const ENDPOINT = 'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search';
@@ -35,7 +38,7 @@ function searchUrl(input: Input, start: number): string {
 }
 
 export async function run(input: Input, ctx: ActorContext): Promise<void> {
-    const { keywords, maxResults = 50 } = input;
+    const { keywords, maxResults = 50, eligibleFrom, includeUnknownEligibility = true } = input;
     if (!keywords?.trim()) throw new Error('keywords is required, e.g. "performance marketing manager"');
 
     const seen = new Set<string>();
@@ -78,15 +81,27 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
         }
 
         let added = 0;
+        let filtered = 0;
         for (const job of cards) {
             if (collected >= maxResults) break;
             if (seen.has(job.url)) continue;
             seen.add(job.url);
 
-            await ctx.pushData({ ...job, scrapedAt: new Date().toISOString() });
+            const row: Record<string, unknown> = { ...job, scrapedAt: new Date().toISOString() };
+
+            if (eligibleFrom) {
+                const verdict = classifyEligibility(job.location, eligibleFrom);
+                if (verdict.eligibility === 'restricted') { filtered++; continue; }
+                if (verdict.eligibility === 'unknown' && !includeUnknownEligibility) { filtered++; continue; }
+                row.eligibility = verdict.eligibility;
+                row.eligibilityReason = verdict.reason;
+            }
+
+            await ctx.pushData(row);
             collected++;
             added++;
         }
+        if (filtered > 0) ctx.log(`start=${start}: ${filtered} listing(s) dropped as not open from ${eligibleFrom}`);
 
         // Pages overlap: LinkedIn returns ~30 cards for a page size of 25, so
         // advancing by what arrived keeps the walk from re-reading the seam.
