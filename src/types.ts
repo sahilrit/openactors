@@ -12,6 +12,19 @@ export type InputSchema = {
     additionalProperties?: boolean;
 };
 
+/**
+ * How an Actor is executed.
+ *
+ * `node` runs it in-process inside the worker, which is fastest and keeps the
+ * typed ActorContext. Anything else is a separate program speaking a line
+ * protocol over stdout, which is what makes an Actor in any language possible
+ * without the server knowing anything about that language.
+ */
+export type ActorRuntime =
+    | 'node'
+    | 'python'
+    | { command: string; args?: string[] };
+
 /** Parsed contents of an `actor.json` manifest, plus where it came from. */
 export interface ActorManifest {
     /** Namespaced id, e.g. `web/site-crawler`. Derived from the directory path. */
@@ -20,6 +33,8 @@ export interface ActorManifest {
     description: string;
     tags: string[];
     input: InputSchema;
+    /** Defaults to `node`. */
+    runtime?: ActorRuntime;
     /** Absolute path to the Actor's directory. */
     dir: string;
     /**

@@ -1,0 +1,25 @@
+{
+  "title": "RSS / Atom Feed Reader",
+  "description": "Reads one or more RSS or Atom feeds and returns their entries with title, link, published date and summary. Useful for watching blogs, release notes, job feeds or news without scraping HTML. Written in Python, which demonstrates that Actors are not tied to one language.",
+  "tags": ["rss", "atom", "feed", "news", "watch", "python"],
+  "runtime": "python",
+  "input": {
+    "type": "object",
+    "properties": {
+      "feedUrls": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Feed URLs to read."
+      },
+      "maxPerFeed": {
+        "type": "integer",
+        "description": "Maximum entries to return from each feed.",
+        "default": 20,
+        "minimum": 1,
+        "maximum": 200
+      }
+    },
+    "required": ["feedUrls"],
+    "additionalProperties": false
+  }
+}

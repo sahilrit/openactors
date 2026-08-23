@@ -26,6 +26,7 @@ export interface SpawnOptions {
     actorName: string;
     runId: string;
     input: unknown;
+    runtime?: import('./types.js').ActorRuntime;
     timeoutMs: number;
     memoryMb?: number;
     graceMs?: number;
@@ -178,7 +179,7 @@ export function spawnActor(options: SpawnOptions): SpawnHandle {
             finish('done');
         });
 
-        const job: ParentMessage = { type: 'run', actorDir, actorName, runId, input };
+        const job: ParentMessage = { type: 'run', actorDir, actorName, runId, input, runtime: options.runtime };
         child.send(job, (err) => {
             if (err) finish('crashed', `could not send the job to the worker: ${err.message}`);
         });

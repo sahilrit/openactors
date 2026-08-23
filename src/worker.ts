@@ -15,6 +15,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ChildMessage, ParentMessage } from './protocol.js';
+import { startExternal } from './external.js';
 import { configureStorage, openDataset } from './storage.js';
 import type { ActorContext, ActorRunFn } from './types.js';
 
@@ -80,12 +81,61 @@ async function execute(job: Extract<ParentMessage, { type: 'run' }>): Promise<vo
             signal: controller.signal,
         };
 
+        const runtime = job.runtime ?? 'node';
+
+        if (runtime !== 'node') {
+            await runExternal(job, ctx, runtime);
+            return;
+        }
+
         const run = await loadRunFn(job.actorDir, job.actorName);
         await run(job.input, ctx);
         finish({ type: 'done' }, 0);
     } catch (err) {
         finish({ type: 'error', message: err instanceof Error ? err.message : String(err) }, 1);
     }
+}
+
+/**
+ * Runs an Actor written in another language, still inside this isolated
+ * process — so it inherits the same timeout, memory ceiling and kill
+ * behaviour as a native one, and the parent stays out of its way entirely.
+ */
+async function runExternal(
+    job: Extract<ParentMessage, { type: 'run' }>,
+    ctx: ActorContext,
+    runtime: Exclude<import('./types.js').ActorRuntime, 'node'>,
+): Promise<void> {
+    const pending: Promise<void>[] = [];
+
+    const { child, done } = startExternal(
+        runtime,
+        job.actorDir,
+        job.input,
+        { OPENACTORS_RUN_ID: job.runId, OPENACTORS_INPUT: JSON.stringify(job.input ?? {}) },
+        {
+            onItem: (item) => {
+                // Writes are queued rather than awaited inline: stdout arrives
+                // faster than the dataset can be written, and blocking the
+                // stream would stall the child's output pipe.
+                pending.push(ctx.pushData(item));
+            },
+            onLog: (message) => ctx.log(message),
+        },
+    );
+
+    // An abort must reach the grandchild too, or killing the worker would
+    // orphan the process actually doing the work.
+    ctx.signal.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
+
+    const { code, signal } = await done;
+    await Promise.allSettled(pending);
+
+    if (code === 0) return finish({ type: 'done' }, 0);
+    finish(
+        { type: 'error', message: `Actor process exited with ${signal ? `signal ${signal}` : `code ${code}`}` },
+        1,
+    );
 }
 
 send({ type: 'ready' });

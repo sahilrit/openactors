@@ -1,0 +1,1 @@
+{"title":"py-echo","description":"fixture","runtime":"python","input":{"type":"object","properties":{"n":{"type":"integer"},"echo":{"type":"string"}}}}

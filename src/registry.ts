@@ -58,6 +58,7 @@ export async function discoverActors(actorsDir = ACTORS_DIR): Promise<ActorManif
                 description: parsed.description ?? '',
                 tags: parsed.tags ?? [],
                 input: parsed.input ?? { type: 'object', properties: {} },
+                runtime: parsed.runtime ?? 'node',
                 requiresEnv: parsed.requiresEnv,
                 gatedReason,
                 dir,

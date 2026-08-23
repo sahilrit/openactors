@@ -158,6 +158,7 @@ export class Runtime {
             actorName: manifest.name,
             runId: id,
             input,
+            runtime: manifest.runtime,
             timeoutMs: timeoutSecs * 1000,
             memoryMb: options.memoryMbytes,
             onLog: (message) => {

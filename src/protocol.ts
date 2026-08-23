@@ -7,7 +7,14 @@
  */
 
 export type ParentMessage =
-    | { type: 'run'; actorDir: string; actorName: string; runId: string; input: unknown }
+    | {
+          type: 'run';
+          actorDir: string;
+          actorName: string;
+          runId: string;
+          input: unknown;
+          runtime?: import('./types.js').ActorRuntime;
+      }
     /** Ask the Actor to stop at its next checkpoint before it is killed outright. */
     | { type: 'abort' };
 
