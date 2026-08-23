@@ -8,7 +8,12 @@ import { configureStorage } from './storage.js';
 async function main(): Promise<void> {
     configureStorage();
 
-    const server = await createServer(new Runtime());
+    const runtime = new Runtime();
+    // Restores persisted history, so get-actor-run finds runs from the
+    // scheduler or a previous session rather than only this process's.
+    await runtime.load();
+
+    const server = await createServer(runtime);
     await server.connect(new StdioServerTransport());
 
     // stdout is the MCP channel; anything human-facing must go to stderr.

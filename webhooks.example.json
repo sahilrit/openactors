@@ -1,0 +1,10 @@
+{
+  "webhooks": [
+    {
+      "url": "https://example.com/hooks/openactors",
+      "events": ["ACTOR.RUN.SUCCEEDED", "ACTOR.RUN.FAILED"],
+      "actors": ["jobs/ats-boards"],
+      "headers": { "X-Signature": "your-shared-secret" }
+    }
+  ]
+}

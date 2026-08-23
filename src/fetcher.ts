@@ -1,8 +1,49 @@
 import { ProxyAgent } from 'undici';
 import { chromium, type Browser } from 'playwright';
+import { HeaderGenerator } from 'header-generator';
 
-const USER_AGENT =
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+/**
+ * Generates complete, internally consistent browser header sets.
+ *
+ * A hand-written User-Agent is the classic tell: it claims a Chrome version
+ * while the accompanying sec-ch-ua, Accept and Accept-Language headers either
+ * disagree with it or are missing entirely. This is Apify's own generator, and
+ * it produces header sets that actually match a real browser build.
+ */
+const headerGenerator = new HeaderGenerator({
+    browsers: ['chrome', 'firefox'],
+    devices: ['desktop'],
+    operatingSystems: ['macos', 'windows'],
+});
+
+/** A stable identity for one logical session, so headers do not change mid-crawl. */
+const sessionHeaders = new Map<string, Record<string, string>>();
+
+export function headersFor(session = 'default'): Record<string, string> {
+    const existing = sessionHeaders.get(session);
+    if (existing) return existing;
+
+    let generated: Record<string, string>;
+    try {
+        generated = headerGenerator.getHeaders() as Record<string, string>;
+    } catch {
+        // Never let header generation be the thing that fails a fetch.
+        generated = {
+            'user-agent':
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'accept-language': 'en-US,en;q=0.9',
+        };
+    }
+
+    sessionHeaders.set(session, generated);
+    return generated;
+}
+
+/** Discards a session's identity, so the next request looks like a new visitor. */
+export function rotateSession(session = 'default'): void {
+    sessionHeaders.delete(session);
+}
 
 /**
  * The single place a proxy is configured. Everything here works from your own
@@ -43,6 +84,12 @@ export interface FetchOptions {
     timeoutMs?: number;
     retries?: number;
     headers?: Record<string, string>;
+    /**
+     * Requests sharing a session share one generated browser identity. Rotating
+     * headers on every request within a crawl is itself anomalous — a real
+     * visitor does not change browser between pages.
+     */
+    session?: string;
 }
 
 /**
@@ -53,7 +100,7 @@ export interface FetchOptions {
  * client look more like a bot, not less.
  */
 export async function fetchText(url: string, options: FetchOptions = {}): Promise<{ status: number; body: string }> {
-    const { signal, timeoutMs = 25_000, retries = 2, headers = {} } = options;
+    const { signal, timeoutMs = 25_000, retries = 2, headers = {}, session = 'default' } = options;
     let lastError = '';
 
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -65,18 +112,16 @@ export async function fetchText(url: string, options: FetchOptions = {}): Promis
         try {
             const res = await fetch(url, {
                 signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
-                headers: {
-                    'user-agent': USER_AGENT,
-                    accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'accept-language': 'en-US,en;q=0.9',
-                    ...headers,
-                },
+                headers: { ...headersFor(session), ...headers },
                 ...(proxyAgent ? ({ dispatcher: proxyAgent } as Record<string, unknown>) : {}),
             });
 
             const retryable = res.status === 429 || res.status >= 500;
             if (!res.ok && retryable && attempt < retries) {
                 lastError = `HTTP ${res.status}`;
+                // A 429 or 403 means this identity is the problem, so retrying
+                // with the same headers repeats the request that just failed.
+                if (res.status === 429 || res.status === 403) rotateSession(session);
                 continue;
             }
             return { status: res.status, body: await res.text() };

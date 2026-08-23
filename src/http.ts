@@ -2,7 +2,8 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from './create-server.js';
-import { discoverActors } from './registry.js';
+import { ActorIndex, discoverActors } from './registry.js';
+import { handleRest } from './rest.js';
 import { Runtime } from './runtime.js';
 import { configureStorage } from './storage.js';
 
@@ -20,6 +21,7 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN ?? null;
  * never find the run that `call-actor` just reported.
  */
 const runtime = new Runtime();
+const index = new ActorIndex();
 
 function unauthorized(res: ServerResponse): void {
     res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' });
@@ -35,17 +37,21 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         return;
     }
 
-    if (url.pathname !== '/mcp') {
-        res.writeHead(404, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ error: 'not found', hint: 'MCP endpoint is /mcp' }));
+    // This server can run arbitrary scrapers, so it must not be left open when
+    // exposed beyond localhost. AUTH_TOKEN is optional to keep local use
+    // frictionless, and the startup log warns loudly when it is unset. Checked
+    // before routing so REST and MCP are equally protected.
+    if (AUTH_TOKEN && req.headers.authorization !== `Bearer ${AUTH_TOKEN}`) {
+        unauthorized(res);
         return;
     }
 
-    // This server can run arbitrary scrapers, so it must not be left open when
-    // exposed beyond localhost. AUTH_TOKEN is optional to keep local use
-    // frictionless, and the startup log warns loudly when it is unset.
-    if (AUTH_TOKEN && req.headers.authorization !== `Bearer ${AUTH_TOKEN}`) {
-        unauthorized(res);
+    // REST first; it reports whether the path was its own.
+    if (await handleRest(req, res, { runtime, index })) return;
+
+    if (url.pathname !== '/mcp') {
+        res.writeHead(404, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: 'not found', hint: 'MCP is at /mcp, REST under /v2, health at /health' }));
         return;
     }
 
@@ -71,9 +77,13 @@ createHttpServer((req, res) => {
             res.end(JSON.stringify({ error: 'internal error' }));
         }
     });
-}).listen(PORT, () => {
+}).listen(PORT, async () => {
     configureStorage();
-    console.log(`[openactors] http listening on :${PORT} — MCP at /mcp, health at /health`);
+    // Run history is read once at startup so a REST caller can inspect runs
+    // started by a previous process or by the scheduler.
+    await runtime.load();
+    await index.refresh();
+    console.log(`[openactors] http listening on :${PORT} — MCP at /mcp, REST at /v2, health at /health`);
     if (!AUTH_TOKEN) {
         console.warn('[openactors] WARNING: AUTH_TOKEN is not set. Do not expose this port beyond localhost.');
     }

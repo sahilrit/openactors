@@ -10,3 +10,4 @@ storage/
 digests/
 searches.json
 logs/
+webhooks.json

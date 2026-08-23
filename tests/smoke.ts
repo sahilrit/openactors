@@ -34,12 +34,13 @@ await client.connect(
 
 const { tools } = await client.listTools();
 const names = tools.map((t) => t.name).sort();
-check('tools registered', names.length === 11, `${names.length}: ${names.join(', ')}`);
+check('tools registered', names.length === 16, `${names.length}: ${names.join(', ')}`);
 check(
     'Apify-compatible tool names',
     ['call-actor', 'fetch-actor-details', 'get-dataset-items', 'search-actors', 'get-actor-run',
      'get-actor-log', 'abort-actor-run', 'get-dataset', 'get-dataset-schema',
-     'get-key-value-store-record', 'get-actor-run-list'].every((n) => names.includes(n)),
+     'get-key-value-store-record', 'get-actor-run-list', 'create-actor-task', 'get-actor-task',
+     'delete-actor-task', 'run-actor-task', 'resurrect-actor-run'].every((n) => names.includes(n)),
 );
 
 const search = payload(await client.callTool({ name: 'search-actors', arguments: { search: 'markdown crawl' } }));
@@ -300,6 +301,38 @@ check('the same roles resolve differently by country', forUs.length > forIndia.l
 check('US-remote roles are open to a US candidate',
     forUs.some((j: any) => j.eligibility === 'open'),
     JSON.stringify(forUs.slice(0, 1).map((j: any) => [j.location, j.eligibility])));
+
+// --- input validation --------------------------------------------------------
+const badInput = await client.callTool({
+    name: 'call-actor',
+    arguments: { actor: 'jobs/ats-boards', input: { boards: 'not-an-array', typoField: 1 } },
+});
+check('invalid input is refused before the run starts', badInput.isError === true &&
+    /unknown field "typoField"/.test(String((badInput as any).content[0].text)),
+    String((badInput as any).content[0].text).slice(0, 90));
+
+// --- tasks -------------------------------------------------------------------
+const created = payload(await client.callTool({
+    name: 'create-actor-task',
+    arguments: { id: 'smoke-task', actor: 'jobs/ats-boards', input: { boards: ['ashby:linear'], titleIncludes: ['engineer'] } },
+}));
+check('task saved', created.id === 'smoke-task' && created.actor === 'jobs/ats-boards');
+
+const taskRun = payload(await client.callTool({
+    name: 'run-actor-task', arguments: { id: 'smoke-task', input: { titleIncludes: ['designer'] } },
+}));
+check('task runs with overrides applied', taskRun.status === 'SUCCEEDED' &&
+    JSON.stringify((taskRun.input as any).titleIncludes) === '["designer"]',
+    `${taskRun.status} ${JSON.stringify((taskRun.input as any)?.titleIncludes)}`);
+
+// --- resurrection ------------------------------------------------------------
+const revived = payload(await client.callTool({ name: 'resurrect-actor-run', arguments: { runId: taskRun.id } }));
+check('run resurrects into a new run', revived.id !== taskRun.id && revived.resurrectedFrom === taskRun.id,
+    `${revived.id} from ${revived.resurrectedFrom}`);
+check('resurrected run is marked as such', revived.origin === 'RESURRECTION', revived.origin);
+
+const cleaned = await client.callTool({ name: 'delete-actor-task', arguments: { id: 'smoke-task' } });
+check('task deleted', cleaned.isError !== true);
 
 await client.close();
 console.log(`\n${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);

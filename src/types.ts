@@ -37,7 +37,33 @@ export interface ActorManifest {
     gatedReason?: string;
 }
 
-export type RunStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'ABORTED';
+/**
+ * Run states, matching Apify's model.
+ *
+ * The distinctions earn their keep: a run that exceeded its time limit
+ * (TIMED-OUT) is a different diagnosis from one a caller stopped (ABORTED),
+ * and collapsing them — as an earlier version did — makes a too-short timeout
+ * look like user action. The transitional states exist so a caller polling a
+ * run can tell "stopping" from "stopped".
+ */
+export const RUN_STATUSES = [
+    'READY',
+    'RUNNING',
+    'TIMING-OUT',
+    'ABORTING',
+    'SUCCEEDED',
+    'FAILED',
+    'TIMED-OUT',
+    'ABORTED',
+] as const;
+
+export type RunStatus = (typeof RUN_STATUSES)[number];
+
+const TERMINAL: ReadonlySet<string> = new Set(['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED']);
+
+export function isTerminal(status: RunStatus): boolean {
+    return TERMINAL.has(status);
+}
 
 export interface RunRecord {
     id: string;
@@ -45,11 +71,19 @@ export interface RunRecord {
     status: RunStatus;
     startedAt: string;
     finishedAt?: string;
+    /** Wall-clock milliseconds, set once the run reaches a terminal state. */
+    durationMs?: number;
     /** Name of the Crawlee Dataset holding this run's items. */
     defaultDatasetId: string;
     itemCount: number;
     input: unknown;
+    /** Timeout the run was started with, so a resurrection can raise it. */
+    timeoutSecs?: number;
     errorMessage?: string;
+    /** How the run was started, mirroring Apify's meta.origin. */
+    origin?: 'API' | 'MCP' | 'SCHEDULER' | 'RESURRECTION' | 'WEBHOOK';
+    /** Id of the run this one was resurrected from. */
+    resurrectedFrom?: string;
     /** Newest-last, capped in the runtime to bound memory. */
     log: string[];
 }

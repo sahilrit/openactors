@@ -79,8 +79,11 @@ export function registerActorTools(server: McpServer, index: ActorIndex, runtime
 
             let record;
             try {
-                record = await runtime.call(manifest, input, timeoutSecs * 1000);
+                record = await runtime.call(manifest, input, { timeoutSecs, origin: 'MCP' });
             } catch (err) {
+                // Input validation failures read as a list of specific problems
+                // rather than a stack trace, so an agent can correct the call
+                // instead of guessing at it.
                 return fail(`Could not start "${manifest.name}": ${(err as Error).message}`);
             }
 

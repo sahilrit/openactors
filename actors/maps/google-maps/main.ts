@@ -66,7 +66,10 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
     try {
         const page = await browser.newPage({
             locale: language,
-            viewport: { width: 1400, height: 1000 },
+            // A viewport jittered around a common size, rather than the exact
+            // same pixel dimensions on every run, which is itself a signal.
+            viewport: { width: 1360 + Math.floor(Math.random() * 120), height: 960 + Math.floor(Math.random() * 120) },
+            timezoneId: process.env.TZ || undefined,
         });
 
         const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}?hl=${encodeURIComponent(language)}`;

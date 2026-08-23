@@ -39,7 +39,10 @@ async function runSearch(search: SavedSearch, runtime: Runtime, now: Date): Prom
         return { ...base, error: `Actor "${search.actor}" not found. Available: ${actors.map((a) => a.name).join(', ')}` };
     }
 
-    const record = await runtime.call(manifest, search.input ?? {}, (search.timeoutSecs ?? 300) * 1000);
+    const record = await runtime.call(manifest, search.input ?? {}, {
+        timeoutSecs: search.timeoutSecs ?? 300,
+        origin: 'SCHEDULER',
+    });
     if (record.status === 'FAILED') {
         return { ...base, error: record.errorMessage ?? 'run failed' };
     }
@@ -54,6 +57,7 @@ async function main(): Promise<void> {
     const { config, path } = await loadConfig(process.argv[2]);
     const now = new Date();
     const runtime = new Runtime();
+    await runtime.load();
     const state = await loadState();
 
     console.error(`[digest] ${config.searches.length} saved search(es) from ${path}`);

@@ -136,6 +136,83 @@ Pages hold ten postings and consecutive offsets are disjoint, so paging advances
 by the number of cards received. Results are deduplicated by URL with tracking
 parameters stripped.
 
+## REST API
+
+Paths mirror Apify's, including its `~` separator for namespaced Actor ids — a
+`/` in an id is otherwise indistinguishable from a path separator, which is
+exactly why Apify chose `~`. A client written against Apify's API mostly needs
+its base URL changed.
+
+```bash
+AUTH_TOKEN=secret npm run start:http
+
+curl -H "Authorization: Bearer secret" localhost:8080/v2/acts
+curl -H "Authorization: Bearer secret" -X POST localhost:8080/v2/acts/jobs~ats-boards/runs \
+     -d '{"boards":["ashby:linear"],"titleIncludes":["engineer"]}'
+curl -H "Authorization: Bearer secret" "localhost:8080/v2/datasets/<id>/items?format=csv&fields=title,url"
+```
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /v2/acts` · `GET /v2/acts/:id` | List Actors; read one with its input schema |
+| `POST /v2/acts/:id/runs?timeout=` | Start a run |
+| `GET /v2/actor-runs` · `/:id` · `/:id/log` | Run history, detail, log |
+| `POST /v2/actor-runs/:id/abort` · `/resurrect` | Stop a run; re-run a finished one |
+| `GET /v2/datasets/:id` · `/:id/items` | Item count; export (see below) |
+| `GET /v2/key-value-stores/:id/records/:key` | Read a stored record |
+| `GET/POST /v2/actor-tasks` · `DELETE /:id` · `POST /:id/runs` | Saved Actor configurations |
+
+**Input is validated against the Actor's schema before a run starts**, as Apify
+does. A misspelled parameter returns `400` naming the unknown field rather than
+running a full crawl that silently ignores it and returns plausible, wrong
+results. Schema defaults are applied, and numeric strings from query parameters
+are coerced.
+
+### Exports
+
+`?format=` accepts `json`, `jsonl`, `csv`, `xml`, `html`, `rss` and `xlsx`, with
+`fields=`, `omit=` (which wins over `fields`, as on Apify), `clean=1` to drop
+`#`-prefixed debug fields, and `attachment=1` for a download filename.
+
+### Run states
+
+The full Apify set: `READY`, `RUNNING`, `TIMING-OUT`, `ABORTING`, `SUCCEEDED`,
+`FAILED`, `TIMED-OUT`, `ABORTED`. The distinctions matter — a run that exceeded
+its limit is a different diagnosis from one a caller stopped, and an earlier
+version reported both as `ABORTED`, making a too-short timeout look like user
+action. Items collected before a timeout are kept.
+
+Runs are **persisted**, so a run started by the scheduler is inspectable from
+the REST API or an MCP client, and survives a restart. A run found still
+`RUNNING` at startup is recorded as failed — its process is gone and nothing
+will finish it.
+
+## Webhooks
+
+```bash
+cp webhooks.example.json webhooks.json    # or just set WEBHOOK_URL
+```
+
+Events use Apify's names — `ACTOR.RUN.CREATED`, `.SUCCEEDED`, `.FAILED`,
+`.ABORTED`, `.TIMED_OUT`, `.RESURRECTED` — and the payload carries the same
+`actorId` / `actorRunId` / `resource` shape, so a consumer written for Apify
+keeps working.
+
+Each webhook may filter by `events` and by `actors`. Delivery retries three
+times with backoff, treats a non-429 4xx as a settled rejection rather than
+retrying it, and can never change a run's outcome: a dead endpoint is logged
+against the run and nothing more.
+
+## Anti-blocking
+
+Requests carry complete, internally consistent browser headers from Apify's own
+`header-generator`, rather than a hand-written User-Agent whose `sec-ch-ua` and
+`Accept` headers contradict the browser it claims to be. One identity is held
+per session — changing browser between pages of a single crawl is itself
+anomalous — and a 429 or 403 rotates it, since retrying with the identity that
+just got refused repeats the failed request. Crawlee's session pool is enabled
+for crawls, and browser runs jitter their viewport.
+
 ## Daily digest
 
 Saved searches, run on a schedule, reporting only what you have not already

@@ -35,6 +35,11 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
 
     const crawler = new CheerioCrawler({
         requestQueue,
+        // Crawlee's session pool rotates identities and retires a session that
+        // starts getting blocked, instead of hammering a target with one that
+        // has already been flagged.
+        useSessionPool: true,
+        persistCookiesPerSession: true,
         // Crawlee persists run statistics to the default key-value store under
         // an id that restarts at 0 with each process. A second server process
         // would therefore load the *previous* run's finished-request count,
