@@ -451,9 +451,16 @@ straight back rather than starting work nobody wants.
 
 **Storage retention.** Every run creates a dataset, so they accumulate — a few
 hundred within a day of ordinary use. `clean-up-storage` (MCP) removes storages
-past a retention window; stores holding configuration are never touched. It
+past a retention window; stores holding configuration are never touched, and it
 defaults to a dry run, because a cleanup that deletes on first acquaintance is
 a trap.
+
+`match` takes a regular expression on the storage name and waives the age
+check, since a name is the more specific instruction of the two. Age alone
+cannot separate throwaway storages from real ones when both were created the
+same day — exactly the state a testing session leaves behind. An invalid
+pattern is refused rather than treated as "match everything", which would
+delete the lot. Pass `protect` to keep named storages regardless.
 
 ## Notes on fragility
 
@@ -493,9 +500,16 @@ straight back rather than starting work nobody wants.
 
 **Storage retention.** Every run creates a dataset, so they accumulate — a few
 hundred within a day of ordinary use. `clean-up-storage` (MCP) removes storages
-past a retention window; stores holding configuration are never touched. It
+past a retention window; stores holding configuration are never touched, and it
 defaults to a dry run, because a cleanup that deletes on first acquaintance is
 a trap.
+
+`match` takes a regular expression on the storage name and waives the age
+check, since a name is the more specific instruction of the two. Age alone
+cannot separate throwaway storages from real ones when both were created the
+same day — exactly the state a testing session leaves behind. An invalid
+pattern is refused rather than treated as "match everything", which would
+delete the lot. Pass `protect` to keep named storages regardless.
 
 ## Notes on fragility
 

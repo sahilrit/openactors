@@ -77,3 +77,35 @@ describe('cleanupStorages', () => {
         await expect(cleanupStorages()).resolves.toMatchObject({ removed: [] });
     });
 });
+
+describe('name matching', () => {
+    it('removes only storages matching the pattern, ignoring age', async () => {
+        // Age cannot separate throwaway from real when both are minutes old,
+        // which is the state a testing session leaves behind.
+        process.env.CRAWLEE_STORAGE_DIR = await storageDir([
+            { kind: 'datasets', name: 'test-run-1', ageDays: 0 },
+            { kind: 'datasets', name: 'test-run-2', ageDays: 0 },
+            { kind: 'datasets', name: 'run-real', ageDays: 0 },
+        ]);
+
+        const result = await cleanupStorages({ match: '^test-run-' });
+        expect(result.removed.sort()).toEqual(['datasets/test-run-1', 'datasets/test-run-2']);
+        expect(await readdir(join(process.env.CRAWLEE_STORAGE_DIR!, 'datasets'))).toEqual(['run-real']);
+    });
+
+    it('still protects configuration stores when a pattern would match them', async () => {
+        process.env.CRAWLEE_STORAGE_DIR = await storageDir([
+            { kind: 'key_value_stores', name: 'runs', ageDays: 0 },
+            { kind: 'key_value_stores', name: 'runs-scratch', ageDays: 0 },
+        ]);
+
+        const result = await cleanupStorages({ match: '^runs' });
+        expect(result.removed).toEqual(['key_value_stores/runs-scratch']);
+    });
+
+    it('refuses an invalid pattern rather than matching everything', async () => {
+        // Treating a broken pattern as "match all" would delete the lot.
+        process.env.CRAWLEE_STORAGE_DIR = await storageDir([{ kind: 'datasets', name: 'a', ageDays: 0 }]);
+        await expect(cleanupStorages({ match: '([unclosed' })).rejects.toThrow(/invalid match pattern/);
+    });
+});

@@ -20,6 +20,15 @@ export interface CleanupOptions {
     protect?: string[];
     /** Report what would be removed without removing it. */
     dryRun?: boolean;
+    /**
+     * Only consider storages whose name matches. Age alone cannot separate
+     * throwaway storages from real ones when both were created the same day —
+     * which is exactly the situation after a testing session.
+     *
+     * Supplying this also waives the age check, since a name pattern is the
+     * more specific instruction of the two.
+     */
+    match?: string;
 }
 
 export interface CleanupResult {
@@ -49,6 +58,17 @@ export async function cleanupStorages(options: CleanupOptions = {}): Promise<Cle
     const protect = new Set([...ALWAYS_PROTECT, ...(options.protect ?? [])]);
     const cutoff = Date.now() - keepDays * 86_400_000;
 
+    let pattern: RegExp | null = null;
+    if (options.match) {
+        try {
+            pattern = new RegExp(options.match);
+        } catch (err) {
+            // Refused rather than ignored: silently treating a bad pattern as
+            // "match everything" would delete the whole storage directory.
+            throw new Error(`invalid match pattern "${options.match}": ${(err as Error).message}`);
+        }
+    }
+
     const root = process.env.CRAWLEE_STORAGE_DIR ?? resolve(PROJECT_ROOT, 'storage');
     const result: CleanupResult = { removed: [], kept: 0, freedBytes: 0 };
 
@@ -63,9 +83,20 @@ export async function cleanupStorages(options: CleanupOptions = {}): Promise<Cle
                 continue;
             }
 
+            if (pattern && !pattern.test(entry.name)) {
+                result.kept++;
+                continue;
+            }
+
             const path = join(base, entry.name);
             const info = await stat(path).catch(() => null);
-            if (!info || info.mtimeMs >= cutoff) {
+            if (!info) {
+                result.kept++;
+                continue;
+            }
+            // A name pattern is the more specific instruction; when one is
+            // given, age is not also required.
+            if (!pattern && info.mtimeMs >= cutoff) {
                 result.kept++;
                 continue;
             }

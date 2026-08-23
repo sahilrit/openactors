@@ -65,10 +65,18 @@ export function registerScheduleTools(server: McpServer): void {
             inputSchema: {
                 keepDays: z.number().int().min(1).max(365).default(7),
                 dryRun: z.boolean().default(true),
+                match: z
+                    .string()
+                    .optional()
+                    .describe(
+                        'Regular expression on the storage name. When given, only matching storages are ' +
+                            'considered and the age check is waived — useful for clearing throwaway storages ' +
+                            'created the same day as real ones.',
+                    ),
             },
         },
-        async ({ keepDays, dryRun }) => {
-            const result = await cleanupStorages({ keepDays, dryRun });
+        async ({ keepDays, dryRun, match }) => {
+            const result = await cleanupStorages({ keepDays, dryRun, match });
             return text({
                 dryRun,
                 removedCount: result.removed.length,
