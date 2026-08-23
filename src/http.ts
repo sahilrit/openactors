@@ -3,6 +3,7 @@ import { createServer as createHttpServer, type IncomingMessage, type ServerResp
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createServer } from './create-server.js';
 import { ActorIndex, discoverActors } from './registry.js';
+import { consoleHtml } from './console.js';
 import { getProxyConfiguration } from './proxy.js';
 import { handleRest } from './rest.js';
 import { resolveActorName } from './aliases.js';
@@ -38,6 +39,14 @@ function unauthorized(res: ServerResponse): void {
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+
+    // The console is served unauthenticated; every call it makes carries the
+    // token, so the page itself reveals nothing without one.
+    if (url.pathname === '/' || url.pathname === '/console') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end(await consoleHtml());
+        return;
+    }
 
     if (url.pathname === '/health') {
         const proxies = await getProxyConfiguration();

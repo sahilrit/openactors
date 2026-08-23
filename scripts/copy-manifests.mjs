@@ -12,4 +12,8 @@ for await (const file of glob('actors/*/*/actor.json', { cwd: root })) {
     count++;
 }
 
-console.log(`copied ${count} actor manifest(s) into dist/`);
+// The console is a static asset; tsc emits only JavaScript, so without this
+// a build would serve the "asset is missing" fallback instead of the console.
+await cp(join(root, 'public'), join(root, 'dist', 'public'), { recursive: true }).catch(() => {});
+
+console.log(`copied ${count} actor manifest(s) and the console into dist/`);

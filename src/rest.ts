@@ -242,21 +242,21 @@ export async function handleRest(req: IncomingMessage, res: ServerResponse, deps
         // GET /v2/datasets
         if (segments[0] === 'datasets' && segments.length === 1 && method === 'GET') {
             const names = await listStorages('datasets');
-            json(res, 200, { data: { total: names.length, items: names.map((id) => ({ id })) } });
+            json(res, 200, { data: { total: names.length, items: names } });
             return true;
         }
 
         // GET /v2/key-value-stores
         if (segments[0] === 'key-value-stores' && segments.length === 1 && method === 'GET') {
             const names = await listStorages('key_value_stores');
-            json(res, 200, { data: { total: names.length, items: names.map((id) => ({ id })) } });
+            json(res, 200, { data: { total: names.length, items: names } });
             return true;
         }
 
         // GET /v2/request-queues
         if (segments[0] === 'request-queues' && segments.length === 1 && method === 'GET') {
             const names = await listStorages('request_queues');
-            json(res, 200, { data: { total: names.length, items: names.map((id) => ({ id })) } });
+            json(res, 200, { data: { total: names.length, items: names } });
             return true;
         }
 

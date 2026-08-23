@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openactors</title>
+<style>
+  :root {
+    --bg:#fbfbfa; --panel:#fff; --fg:#1a1a1a; --muted:#6b6b6b; --line:#e6e4e0;
+    --accent:#2f6feb; --ok:#1a7f37; --warn:#9a6700; --err:#b42318; --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#151515; --panel:#1d1d1d; --fg:#ececec; --muted:#9a9a9a; --line:#2f2f2f;
+      --accent:#6f9bff; --ok:#4ac26b; --warn:#d4a72c; --err:#ff6b60;
+    }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  header { display:flex; align-items:center; gap:1rem; padding:.7rem 1rem; border-bottom:1px solid var(--line);
+           background:var(--panel); position:sticky; top:0; z-index:5; flex-wrap:wrap }
+  header h1 { font-size:.95rem; margin:0; font-weight:650; letter-spacing:-.01em }
+  nav { display:flex; gap:.25rem; flex-wrap:wrap }
+  nav button { background:none; border:1px solid transparent; color:var(--muted); padding:.3rem .6rem;
+               border-radius:6px; cursor:pointer; font:inherit }
+  nav button:hover { color:var(--fg); background:var(--bg) }
+  nav button[aria-current="true"] { color:var(--fg); border-color:var(--line); background:var(--bg) }
+  #status { margin-left:auto; color:var(--muted); font-size:.8rem; display:flex; gap:.7rem; align-items:center }
+  main { padding:1rem; max-width:1200px; margin:0 auto }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:.9rem 1rem; margin-bottom:.8rem }
+  .card h2 { margin:0 0 .1rem; font-size:.92rem; font-weight:620 }
+  .card p { margin:.15rem 0 .5rem; color:var(--muted); font-size:.86rem }
+  .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
+  .tag { font-size:.72rem; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:.05rem .45rem }
+  button.act { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:.35rem .7rem;
+               cursor:pointer; font:inherit; font-size:.84rem }
+  button.act:hover { filter:brightness(1.07) }
+  button.ghost { background:none; border:1px solid var(--line); color:var(--fg); border-radius:6px;
+                 padding:.3rem .6rem; cursor:pointer; font:inherit; font-size:.82rem }
+  table { border-collapse:collapse; width:100%; font-size:.85rem }
+  th,td { text-align:left; padding:.4rem .55rem; border-bottom:1px solid var(--line); vertical-align:top }
+  th { color:var(--muted); font-weight:600; white-space:nowrap }
+  .scroll { overflow-x:auto }
+  textarea { width:100%; min-height:110px; font:12.5px/1.45 var(--mono); padding:.6rem;
+             border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--fg); resize:vertical }
+  pre { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:.7rem;
+        overflow:auto; max-height:340px; font:12px/1.45 var(--mono); margin:.4rem 0 0 }
+  input { font:inherit; padding:.35rem .5rem; border:1px solid var(--line); border-radius:6px;
+          background:var(--bg); color:var(--fg) }
+  .s { font-weight:600; font-size:.78rem }
+  .s-SUCCEEDED{color:var(--ok)} .s-FAILED,.s-TIMED-OUT{color:var(--err)}
+  .s-RUNNING,.s-READY{color:var(--accent)} .s-ABORTED,.s-ABORTING,.s-TIMING-OUT{color:var(--warn)}
+  .empty { color:var(--muted); padding:1.2rem; text-align:center }
+  a { color:var(--accent) }
+</style>
+
+<header>
+  <h1>openactors</h1>
+  <nav id="nav"></nav>
+  <div id="status"></div>
+</header>
+<main id="view"><div class="empty">Loading…</div></main>
+
+<script>
+const TABS = ['Actors', 'Runs', 'Schedules', 'Tasks', 'Storage'];
+let tab = location.hash.replace('#', '') || 'Actors';
+let token = localStorage.getItem('openactors-token') || '';
+
+const el = (id) => document.getElementById(id);
+const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const short = (v, n = 60) => { const s = String(v ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+
+async function api(path, options = {}) {
+  const res = await fetch('/v2' + path, {
+    ...options,
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}), ...(options.headers || {}) },
+  });
+  if (res.status === 401) {
+    // Asked for once and remembered: the console is useless without it, and
+    // prompting on every request would be intolerable.
+    const entered = prompt('AUTH_TOKEN for this server:');
+    if (entered) { token = entered; localStorage.setItem('openactors-token', entered); return api(path, options); }
+    throw new Error('unauthorized');
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || ('HTTP ' + res.status));
+  return body.data;
+}
+
+function renderNav() {
+  el('nav').innerHTML = TABS.map((t) =>
+    '<button aria-current="' + (t === tab) + '" onclick="go(\'' + t + '\')">' + t + '</button>').join('');
+}
+window.go = (t) => { tab = t; location.hash = t; renderNav(); render(); };
+
+async function renderStatus() {
+  try {
+    const res = await fetch('/health', { headers: token ? { authorization: 'Bearer ' + token } : {} });
+    const h = await res.json();
+    el('status').innerHTML =
+      '<span>' + h.actors.length + ' actors</span>' +
+      '<span>' + h.runs.running + '/' + h.runs.limit + ' running' + (h.runs.queued ? ' · ' + h.runs.queued + ' queued' : '') + '</span>' +
+      '<span>proxy ' + (h.proxy.enabled ? 'on' : 'off') + '</span>';
+  } catch { el('status').textContent = 'offline'; }
+}
+
+const views = {};
+
+views.Actors = async () => {
+  const { items } = await api('/acts');
+  return items.map((a) => `
+    <div class="card">
+      <div class="row"><h2>${esc(a.name)}</h2>
+        ${a.runnable ? '' : '<span class="tag">gated</span>'}
+        ${(a.tags || []).slice(0, 4).map((t) => '<span class="tag">' + esc(t) + '</span>').join('')}
+      </div>
+      <p>${esc(short(a.description, 220))}</p>
+      <div class="row">
+        <button class="ghost" onclick="toggleRun('${esc(a.id)}')">Run…</button>
+        <button class="ghost" onclick="showSchema('${esc(a.id)}')">Input schema</button>
+      </div>
+      <div id="run-${esc(a.id)}" hidden style="margin-top:.6rem">
+        <textarea id="in-${esc(a.id)}">{}</textarea>
+        <div class="row" style="margin-top:.4rem">
+          <button class="act" onclick="runActor('${esc(a.id)}')">Start run</button>
+          <span id="out-${esc(a.id)}" class="tag" hidden></span>
+        </div>
+      </div>
+      <div id="schema-${esc(a.id)}" hidden></div>
+    </div>`).join('');
+};
+
+window.toggleRun = (id) => { const n = el('run-' + id); n.hidden = !n.hidden; };
+window.showSchema = async (id) => {
+  const n = el('schema-' + id);
+  if (!n.hidden) { n.hidden = true; return; }
+  const a = await api('/acts/' + encodeURIComponent(id));
+  n.innerHTML = '<pre>' + esc(JSON.stringify(a.input, null, 2)) + '</pre>';
+  n.hidden = false;
+};
+window.runActor = async (id) => {
+  const out = el('out-' + id);
+  out.hidden = false; out.textContent = 'running…';
+  try {
+    const input = JSON.parse(el('in-' + id).value || '{}');
+    const run = await api('/acts/' + encodeURIComponent(id) + '/runs', { method: 'POST', body: JSON.stringify(input) });
+    out.textContent = run.status + ' · ' + run.itemCount + ' items';
+    renderStatus();
+  } catch (err) { out.textContent = err.message; }
+};
+
+views.Runs = async () => {
+  const { items } = await api('/actor-runs?limit=50');
+  if (!items.length) return '<div class="empty">No runs yet.</div>';
+  return '<div class="card scroll"><table><thead><tr>' +
+    ['Status','Actor','Items','Duration','Memory','Started','',''].map((h) => '<th>' + h + '</th>').join('') +
+    '</tr></thead><tbody>' + items.map((r) => `
+      <tr>
+        <td><span class="s s-${esc(r.status)}">${esc(r.status)}</span></td>
+        <td>${esc(r.actorName)}</td>
+        <td>${r.itemCount}</td>
+        <td>${r.durationMs != null ? (r.durationMs / 1000).toFixed(1) + 's' : '—'}</td>
+        <td>${r.peakMemoryMb != null ? r.peakMemoryMb + 'MB' : '—'}</td>
+        <td>${esc(r.startedAt.slice(0, 19).replace('T', ' '))}</td>
+        <td><button class="ghost" onclick="showLog('${esc(r.id)}')">Log</button></td>
+        <td><a href="/v2/datasets/${esc(r.defaultDatasetId)}/items?format=csv&attachment=1" download>CSV</a></td>
+      </tr>
+      <tr id="log-${esc(r.id)}" hidden><td colspan="8"><pre id="logbody-${esc(r.id)}"></pre></td></tr>`).join('') +
+    '</tbody></table></div>';
+};
+
+window.showLog = async (id) => {
+  const row = el('log-' + id);
+  if (!row.hidden) { row.hidden = true; return; }
+  const res = await fetch('/v2/actor-runs/' + id + '/log', { headers: token ? { authorization: 'Bearer ' + token } : {} });
+  el('logbody-' + id).textContent = (await res.text()) || '(no output)';
+  row.hidden = false;
+};
+
+views.Schedules = async () => {
+  const { items } = await api('/schedules');
+  const form = `
+    <div class="card">
+      <h2>New schedule</h2>
+      <div class="row">
+        <input id="sid" placeholder="id" size="14">
+        <input id="scron" placeholder="0 */6 * * *" size="12">
+        <input id="sactor" placeholder="actor id" size="18">
+        <input id="stz" placeholder="timezone (optional)" size="16">
+        <button class="act" onclick="addSchedule()">Create</button>
+      </div>
+      <textarea id="sinput" style="margin-top:.5rem;min-height:70px">{}</textarea>
+      <p id="serr"></p>
+    </div>`;
+  if (!items.length) return form + '<div class="empty">No schedules.</div>';
+  return form + '<div class="card scroll"><table><thead><tr>' +
+    ['Id','Cron','Target','Next run','Last run','',''].map((h) => '<th>' + h + '</th>').join('') +
+    '</tr></thead><tbody>' + items.map((s) => `
+      <tr>
+        <td>${esc(s.id)}</td><td><code>${esc(s.cron)}</code></td>
+        <td>${esc(s.actor || 'task:' + s.task)}</td>
+        <td>${esc((s.nextRunAt || '—').slice(0, 16).replace('T', ' '))}</td>
+        <td>${esc((s.lastRunAt || '—').slice(0, 16).replace('T', ' '))}${s.lastError ? ' <span class="s s-FAILED">error</span>' : ''}</td>
+        <td><button class="ghost" onclick="runSchedule('${esc(s.id)}')">Run now</button></td>
+        <td><button class="ghost" onclick="delSchedule('${esc(s.id)}')">Delete</button></td>
+      </tr>`).join('') + '</tbody></table></div>';
+};
+
+window.addSchedule = async () => {
+  try {
+    await api('/schedules', { method: 'POST', body: JSON.stringify({
+      id: el('sid').value.trim(), cron: el('scron').value.trim(), actor: el('sactor').value.trim(),
+      timezone: el('stz').value.trim() || undefined, input: JSON.parse(el('sinput').value || '{}'),
+    })});
+    render();
+  } catch (err) { el('serr').textContent = err.message; }
+};
+window.delSchedule = async (id) => { await api('/schedules/' + id, { method: 'DELETE' }); render(); };
+window.runSchedule = async (id) => { await api('/schedules/' + id + '/run', { method: 'POST' }); go('Runs'); };
+
+views.Tasks = async () => {
+  const { items } = await api('/actor-tasks');
+  if (!items.length) return '<div class="empty">No saved tasks. Create them over REST or MCP.</div>';
+  return items.map((t) => `
+    <div class="card">
+      <div class="row"><h2>${esc(t.id)}</h2><span class="tag">${esc(t.actor)}</span></div>
+      <pre>${esc(JSON.stringify(t.input, null, 2))}</pre>
+      <div class="row" style="margin-top:.5rem">
+        <button class="act" onclick="runTask('${esc(t.id)}')">Run</button>
+        <button class="ghost" onclick="delTask('${esc(t.id)}')">Delete</button>
+      </div>
+    </div>`).join('');
+};
+window.runTask = async (id) => { await api('/actor-tasks/' + id + '/runs', { method: 'POST', body: '{}' }); go('Runs'); };
+window.delTask = async (id) => { await api('/actor-tasks/' + id, { method: 'DELETE' }); render(); };
+
+views.Storage = async () => {
+  const [datasets, stores] = await Promise.all([api('/datasets'), api('/key-value-stores')]);
+  const list = (title, items, kind) => `
+    <div class="card">
+      <h2>${title}</h2><p>${items.total} total${items.total > 30 ? ' · newest 30 shown' : ''}</p>
+      <div class="scroll"><table><tbody>${items.items.slice(0, 30).map((d) => `
+        <tr><td><code>${esc(d.id)}</code></td>
+        <td style="color:var(--muted);white-space:nowrap">${esc((d.modifiedAt || '').slice(0, 16).replace('T', ' '))}</td>
+        <td style="text-align:right">${kind === 'datasets'
+          ? ['json','csv','xlsx'].map((f) => '<a href="/v2/datasets/' + esc(d.id) + '/items?format=' + f + '&attachment=1" download>' + f + '</a>').join(' · ')
+          : ''}</td></tr>`).join('')}</tbody></table></div>
+    </div>`;
+  return list('Datasets', datasets, 'datasets') + list('Key-value stores', stores, 'kv');
+};
+
+async function render() {
+  el('view').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    el('view').innerHTML = await views[tab]();
+  } catch (err) {
+    el('view').innerHTML = '<div class="card"><h2>Could not load</h2><p>' + esc(err.message) + '</p></div>';
+  }
+  renderStatus();
+}
+
+renderNav();
+render();
+setInterval(renderStatus, 10000);
+</script>
+</html>

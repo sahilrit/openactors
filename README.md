@@ -136,6 +136,22 @@ Pages hold ten postings and consecutive offsets are disjoint, so paging advances
 by the number of cards received. Results are deduplicated by URL with tracking
 parameters stripped.
 
+## Console
+
+```bash
+AUTH_TOKEN=secret npm run start:http   # then open http://localhost:8080
+```
+
+A single page served by the server: browse Actors and run them with arbitrary
+input, watch runs with their duration, memory and item counts, read logs,
+manage schedules and tasks, and download any dataset as JSON, CSV or Excel.
+
+Self-contained — no CDN, no external fonts, nothing fetched from the network —
+so it works offline and under a strict content policy, which is the right
+default for a tool that runs scrapers on your own machine. The page itself is
+served unauthenticated; every request it makes carries the token, so it reveals
+nothing without one.
+
 ## REST API
 
 Paths mirror Apify's, including its `~` separator for namespaced Actor ids — a

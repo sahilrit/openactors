@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "openactors-console",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dist/src/http.js"],
+      "port": 8080
+    }
+  ]
+}

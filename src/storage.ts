@@ -41,10 +41,30 @@ export { Dataset, KeyValueStore };
  * picks up storages written by a previous process, which an in-memory registry
  * would miss.
  */
-export async function listStorages(kind: 'datasets' | 'key_value_stores' | 'request_queues'): Promise<string[]> {
-    const { readdir } = await import('node:fs/promises');
-    const root = process.env.CRAWLEE_STORAGE_DIR ?? resolve(PROJECT_ROOT, 'storage');
+export interface StorageSummary {
+    id: string;
+    modifiedAt: string;
+}
 
-    const entries = await readdir(resolve(root, kind), { withFileTypes: true }).catch(() => []);
-    return entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+export async function listStorages(
+    kind: 'datasets' | 'key_value_stores' | 'request_queues',
+): Promise<StorageSummary[]> {
+    const { readdir, stat } = await import('node:fs/promises');
+    const root = process.env.CRAWLEE_STORAGE_DIR ?? resolve(PROJECT_ROOT, 'storage');
+    const base = resolve(root, kind);
+
+    const entries = await readdir(base, { withFileTypes: true }).catch(() => []);
+    const summaries = await Promise.all(
+        entries
+            .filter((e) => e.isDirectory())
+            .map(async (e) => {
+                const info = await stat(resolve(base, e.name)).catch(() => null);
+                return { id: e.name, modifiedAt: new Date(info?.mtimeMs ?? 0).toISOString() };
+            }),
+    );
+
+    // Newest first. Sorting by name looks right while ids share a prefix and
+    // silently stops being newest-first the moment they do not — which is how
+    // a list of recent runs ends up showing only whichever prefix sorts last.
+    return summaries.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
 }
