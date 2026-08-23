@@ -20,6 +20,12 @@ export interface NormalizedJob {
     location: string | null;
     /** True/false where the provider states it; null where it must be guessed. */
     remote: boolean | null;
+    /**
+     * Remote / Hybrid / OnSite where the provider distinguishes them. Kept
+     * alongside `remote` because collapsing hybrid into a boolean loses the
+     * distinction that decides whether a role is actually applicable.
+     */
+    workplaceType: string | null;
     department: string | null;
     team: string | null;
     employmentType: string | null;
@@ -43,9 +49,24 @@ const str = (v: unknown): string | null => {
     return s.length > 0 ? s : null;
 };
 
-/** Only used where the provider gives no explicit remote flag. */
+/** Only used where the provider gives no explicit workplace type. */
 const looksRemote = (location: string | null): boolean | null =>
     location === null ? null : /\bremote\b|\banywhere\b|work from home/i.test(location);
+
+/**
+ * Resolves a provider's workplace-type string to a strict remote boolean.
+ *
+ * Strict is the point: "hybrid" is not remote. Providers that also expose a
+ * boolean remote flag set it true for hybrid roles too — Ramp's Ashby board
+ * carries 123 `isRemote: true` postings of which only 16 are actually Remote —
+ * so the typed field is the only trustworthy source, and the location text is
+ * the fallback when it is absent.
+ */
+const remoteFromWorkplaceType = (workplaceType: string | null, location: string | null): boolean | null => {
+    if (!workplaceType || /unspecified/i.test(workplaceType)) return looksRemote(location);
+    if (/^remote$/i.test(workplaceType.trim())) return true;
+    return false;
+};
 
 const iso = (v: unknown): string | null => {
     if (v === null || v === undefined) return null;
@@ -75,6 +96,7 @@ export const PROVIDERS: Record<string, Provider> = {
                 applyUrl: str(j.absolute_url),
                 location,
                 remote: looksRemote(location),
+                workplaceType: null,
                 department: str(j.departments?.[0]?.name),
                 team: null,
                 employmentType: null,
@@ -98,8 +120,8 @@ export const PROVIDERS: Record<string, Provider> = {
                 url: str(j.hostedUrl) ?? '',
                 applyUrl: str(j.applyUrl),
                 location,
-                // Lever states workplaceType directly on newer postings.
-                remote: j.workplaceType ? /remote/i.test(String(j.workplaceType)) : looksRemote(location),
+                remote: remoteFromWorkplaceType(str(j.workplaceType), location),
+                workplaceType: str(j.workplaceType),
                 department: str(j.categories?.department),
                 team: str(j.categories?.team),
                 employmentType: str(j.categories?.commitment),
@@ -121,7 +143,10 @@ export const PROVIDERS: Record<string, Provider> = {
             url: str(j.jobUrl) ?? '',
             applyUrl: str(j.applyUrl),
             location: str(j.location),
-            remote: typeof j.isRemote === 'boolean' ? j.isRemote : looksRemote(str(j.location)),
+            // Deliberately ignores Ashby's `isRemote`, which is true for hybrid
+            // roles as well and would report an office job as remote.
+            remote: remoteFromWorkplaceType(str(j.workplaceType), str(j.location)),
+            workplaceType: str(j.workplaceType),
             department: str(j.department),
             team: str(j.team),
             employmentType: str(j.employmentType),
@@ -145,6 +170,7 @@ export const PROVIDERS: Record<string, Provider> = {
                 applyUrl: `https://jobs.smartrecruiters.com/${account}/${j.id}`,
                 location,
                 remote: typeof j.location?.remote === 'boolean' ? j.location.remote : looksRemote(location),
+                workplaceType: null,
                 department: str(j.department?.label),
                 team: str(j.function?.label),
                 employmentType: str(j.typeOfEmployment?.label),
@@ -173,6 +199,7 @@ export const PROVIDERS: Record<string, Provider> = {
                 applyUrl: str(j.application_url ?? j.url),
                 location,
                 remote: typeof j.telecommuting === 'boolean' ? j.telecommuting : looksRemote(location),
+                workplaceType: null,
                 department: str(j.department),
                 team: null,
                 employmentType: str(j.employment_type),
@@ -199,6 +226,7 @@ export const PROVIDERS: Record<string, Provider> = {
                 applyUrl: str(j.careers_apply_url ?? j.careers_url),
                 location,
                 remote: typeof j.remote === 'boolean' ? j.remote : looksRemote(location),
+                workplaceType: null,
                 department: str(j.department),
                 team: null,
                 employmentType: str(j.employment_type_code ?? j.employment_type),

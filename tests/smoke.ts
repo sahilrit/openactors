@@ -170,6 +170,22 @@ check('remoteOnly filters to remote roles',
     remote.itemCount > 0 && (remote.items ?? []).every((j: any) => j.remote === true),
     `itemCount=${remote.itemCount}`);
 
+// Regression: Ashby's isRemote is true for hybrid roles, so remoteOnly used to
+// return office jobs. workplaceType is the field that actually distinguishes.
+const remoteAshby = payload(
+    await client.callTool({
+        name: 'call-actor',
+        arguments: {
+            actor: 'jobs/ats-boards',
+            input: { boards: ['ashby:ramp', 'ashby:replit'], titleIncludes: ['growth'], remoteOnly: true },
+            timeoutSecs: 180,
+        },
+    }),
+);
+check('remoteOnly excludes hybrid and onsite roles',
+    (remoteAshby.items ?? []).every((j: any) => !j.workplaceType || j.workplaceType === 'Remote'),
+    JSON.stringify([...new Set((remoteAshby.items ?? []).map((j: any) => j.workplaceType))]));
+
 // --- rag-browser -----------------------------------------------------------
 console.log('\n… live web search\n');
 const searched = payload(

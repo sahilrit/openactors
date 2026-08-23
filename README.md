@@ -149,6 +149,13 @@ company's job-board URL:
 }
 ```
 
+Results carry both `remote` (a strict boolean) and `workplaceType`
+(`Remote`/`Hybrid`/`OnSite` where the provider distinguishes them). `remoteOnly`
+is strict: hybrid is not remote. This matters more than it sounds — Ashby's own
+`isRemote` field is `true` for hybrid roles too, so Ramp's board reports 123
+"remote" postings of which only 16 actually are. The adapter ignores that field
+and reads `workplaceType` instead.
+
 Greenhouse, Lever, Ashby and SmartRecruiters adapters are verified against live
 boards. Workable and Recruitee are written from their documented shapes but were
 never exercised against a populated board — every one reachable during

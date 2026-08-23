@@ -46,13 +46,52 @@ describe.each(['greenhouse', 'lever', 'ashby', 'smartrecruiters'])('%s normalize
 });
 
 describe('remote detection', () => {
-    it('trusts an explicit provider flag over the location text', () => {
-        // Ashby states isRemote; a location naming a city must not override it.
+    it('trusts the typed workplace field over the location text', () => {
         const job = PROVIDERS.ashby.normalize(
-            { id: '1', title: 'X', jobUrl: 'https://x.test/1', location: 'Berlin', isRemote: true },
+            { id: '1', title: 'X', jobUrl: 'https://x.test/1', location: 'Berlin', workplaceType: 'Remote' },
             'acme',
         );
         expect(job.remote).toBe(true);
+    });
+
+    // Regression: Ashby's isRemote is true for hybrid roles too. Ramp's board
+    // carries 123 isRemote:true postings of which only 16 are actually Remote,
+    // so trusting it reported New York office jobs as remote.
+    it('does not treat hybrid as remote, even when isRemote says true', () => {
+        const job = PROVIDERS.ashby.normalize(
+            {
+                id: '1',
+                title: 'Software Engineer, Growth Platform',
+                jobUrl: 'https://x.test/1',
+                location: 'New York, NY (HQ)',
+                isRemote: true,
+                workplaceType: 'Hybrid',
+            },
+            'acme',
+        );
+        expect(job.remote).toBe(false);
+        expect(job.workplaceType).toBe('Hybrid');
+    });
+
+    it('treats onsite as not remote', () => {
+        const job = PROVIDERS.ashby.normalize(
+            { id: '1', title: 'X', jobUrl: 'https://x.test/1', location: 'SF', isRemote: true, workplaceType: 'OnSite' },
+            'acme',
+        );
+        expect(job.remote).toBe(false);
+    });
+
+    it('falls back to the location when the workplace type is absent or unspecified', () => {
+        const absent = PROVIDERS.ashby.normalize(
+            { id: '1', title: 'X', jobUrl: 'https://x.test/1', location: 'Remote U.S.', isRemote: true },
+            'acme',
+        );
+        const unspecified = PROVIDERS.lever.normalize(
+            { id: 'a', text: 'X', hostedUrl: 'https://x.test/a', workplaceType: 'unspecified', categories: { location: 'Remote' } },
+            'acme',
+        );
+        expect(absent.remote).toBe(true);
+        expect(unspecified.remote).toBe(true);
     });
 
     it('infers from the location where no flag exists', () => {
