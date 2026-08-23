@@ -177,6 +177,27 @@ publish that other server, which may have no authentication at all.
 Tokens and client registrations survive a restart, so restarting the server does
 not force you to re-add the connector.
 
+### A permanent URL
+
+A quick tunnel's hostname changes every restart, which means re-adding the
+connector each time. For a stable one:
+
+```bash
+.bin/cloudflared tunnel login                       # once; opens a browser
+scripts/named-tunnel.sh setup jobs.yourdomain.com
+OAUTH_PASSWORD='…' scripts/named-tunnel.sh run jobs.yourdomain.com
+OAUTH_PASSWORD='…' scripts/named-tunnel.sh install jobs.yourdomain.com   # start at login
+```
+
+This needs **a domain on your Cloudflare account** — Cloudflare's constraint,
+not this script's: named tunnels route through a zone you control, and there is
+no free Cloudflare-provided hostname for them. Any domain works, including one
+already on Cloudflare for something else; a subdomain is enough.
+
+`install` registers a launchd agent that starts the tunnel and server at login
+and restarts them if they die, which is what makes the URL genuinely permanent
+rather than merely stable.
+
 **A DNS caveat worth knowing:** some ISP resolvers return NXDOMAIN for
 `*.trycloudflare.com`. Claude is unaffected — it resolves through its own DNS —
 but *your* browser may not open the consent page. Point your Mac at 1.1.1.1 or

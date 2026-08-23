@@ -13,3 +13,4 @@ logs/
 webhooks.json
 proxy.json
 .bin/
+.oauth-password
