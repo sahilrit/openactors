@@ -209,14 +209,21 @@ export const PROVIDERS: Record<string, Provider> = {
         },
     },
 
-    // Same caveat as Workable: no populated live board was available to verify
-    // the per-job fields against.
     recruitee: {
-        verified: false,
+        verified: true,
         url: (a) => `https://${encodeURIComponent(a)}.recruitee.com/api/offers/`,
         extract: (b) => b?.offers ?? [],
         normalize: (j, account) => {
             const location = str(j.location ?? [j.city, j.country].filter(Boolean).join(', '));
+
+            // Recruitee exposes remote/hybrid/on_site as three independent
+            // booleans rather than one enum, and sets `hybrid` on nearly every
+            // posting — so they are read in priority order. Unlike Ashby's
+            // isRemote, its `remote` flag is trustworthy: it is false for office
+            // roles and true only for genuinely remote ones.
+            const workplaceType =
+                j.remote === true ? 'Remote' : j.on_site === true ? 'OnSite' : j.hybrid === true ? 'Hybrid' : null;
+
             return {
                 ats: 'recruitee',
                 account,
@@ -226,10 +233,11 @@ export const PROVIDERS: Record<string, Provider> = {
                 applyUrl: str(j.careers_apply_url ?? j.careers_url),
                 location,
                 remote: typeof j.remote === 'boolean' ? j.remote : looksRemote(location),
-                workplaceType: null,
+                workplaceType,
                 department: str(j.department),
                 team: null,
                 employmentType: str(j.employment_type_code ?? j.employment_type),
+                // Recruitee stamps dates as "2026-08-05 10:10:39 UTC".
                 publishedAt: iso(j.published_at),
                 description: str(j.description),
             };

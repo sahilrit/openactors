@@ -13,7 +13,7 @@ const load = (name: string) => JSON.parse(readFileSync(join(FIXTURES, `${name}.j
  * job's title into "(untitled)" without any error — so they are the part that
  * earns unit tests.
  */
-describe.each(['greenhouse', 'lever', 'ashby', 'smartrecruiters'])('%s normalizer', (name) => {
+describe.each(['greenhouse', 'lever', 'ashby', 'smartrecruiters', 'recruitee'])('%s normalizer', (name) => {
     const job = PROVIDERS[name].normalize(load(name), 'acme');
 
     it('reports its own provider and the account it was asked for', () => {
@@ -110,6 +110,31 @@ describe('remote detection', () => {
     it('stays null when the location is unknown', () => {
         const job = PROVIDERS.greenhouse.normalize({ id: 3, title: 'Z', absolute_url: 'https://x.test/3' }, 'acme');
         expect(job.remote).toBeNull();
+    });
+});
+
+describe('recruitee', () => {
+    it('parses its non-ISO date stamp rather than dropping it', () => {
+        const job = PROVIDERS.recruitee.normalize(
+            { id: 1, title: 'X', careers_url: 'https://x.test/1', published_at: '2026-08-05 10:10:39 UTC' },
+            'acme',
+        );
+        expect(job.publishedAt).toBe('2026-08-05T10:10:39.000Z');
+    });
+
+    it('reads the three independent workplace booleans in priority order', () => {
+        const base = { id: 1, title: 'X', careers_url: 'https://x.test/1' };
+        // hybrid is set on nearly every Recruitee posting, so remote wins.
+        expect(PROVIDERS.recruitee.normalize({ ...base, remote: true, hybrid: true }, 'a').workplaceType).toBe('Remote');
+        expect(PROVIDERS.recruitee.normalize({ ...base, remote: false, hybrid: true }, 'a').workplaceType).toBe('Hybrid');
+        expect(PROVIDERS.recruitee.normalize({ ...base, remote: false, on_site: true, hybrid: true }, 'a').workplaceType).toBe('OnSite');
+        expect(PROVIDERS.recruitee.normalize(base, 'a').workplaceType).toBeNull();
+    });
+
+    it('trusts its remote flag, which is accurate unlike Ashby\'s', () => {
+        const base = { id: 1, title: 'X', careers_url: 'https://x.test/1', hybrid: true };
+        expect(PROVIDERS.recruitee.normalize({ ...base, remote: false, location: 'Berlin, Germany' }, 'a').remote).toBe(false);
+        expect(PROVIDERS.recruitee.normalize({ ...base, remote: true, location: 'Remote job' }, 'a').remote).toBe(true);
     });
 });
 

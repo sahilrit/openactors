@@ -156,11 +156,11 @@ is strict: hybrid is not remote. This matters more than it sounds — Ashby's ow
 "remote" postings of which only 16 actually are. The adapter ignores that field
 and reads `workplaceType` instead.
 
-Greenhouse, Lever, Ashby and SmartRecruiters adapters are verified against live
-boards. Workable and Recruitee are written from their documented shapes but were
-never exercised against a populated board — every one reachable during
-development had zero open roles. They are marked `verified: false` in
-`providers.ts` and the run log says so when you use them.
+Greenhouse, Lever, Ashby, SmartRecruiters and Recruitee adapters are verified
+against live boards. Workable alone is written from its documented shape and
+never exercised against a populated board — every Workable account reachable
+during development had zero open roles. It is marked `verified: false` in
+`providers.ts`, and the run log says so when you use it.
 
 ## Writing an Actor
 
@@ -254,9 +254,13 @@ LinkedIn gate refusing to run.
 captured real card text, and the LinkedIn daily budget.
 
 **Not verified:** `linkedin/jobs` extraction (needs a burner account this build
-did not have), the Workable and Recruitee adapters (no populated board was
-reachable — they are marked `verified: false` in `providers.ts`), and the Docker
-image (never built; the base tag was confirmed to exist upstream, nothing more).
+did not have), the Workable adapter (no populated Workable board was reachable —
+marked `verified: false` in `providers.ts`), and the Docker image (never built;
+the base tag was confirmed to exist upstream, nothing more).
+
+Note that the two real bugs found so far were both caught by *using* the tool,
+not by the test suite: a second crawl silently returning nothing, and hybrid
+roles being reported as remote. The suite now covers both.
 
 ## License
 
