@@ -31,6 +31,7 @@
     "@mozilla/readability": "^0.6.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
+    "cron-parser": "^5.10.0",
     "exceljs": "^4.4.0",
     "header-generator": "^2.1.88",
     "jsdom": "^30.0.1",

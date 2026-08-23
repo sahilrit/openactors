@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { ActorManifest, RunRecord, RunStatus } from './types.js';
 import { isTerminal } from './types.js';
+import { availableParallelism } from 'node:os';
+import { Semaphore } from './semaphore.js';
 import { spawnActor, type SpawnHandle, type SpawnOutcome } from './spawn.js';
 import { openKeyValueStore } from './storage.js';
 import { validateInput } from './validate.js';
@@ -17,6 +19,16 @@ const MAX_PERSISTED_RUNS = 500;
 
 const RUN_STORE = 'runs';
 const RUN_KEY = 'history';
+
+/**
+ * Concurrent runs. Each is a child process with its own heap, so this is a
+ * ceiling on real machine resources rather than a throughput knob. One less
+ * than the core count leaves the server itself responsive while runs are busy.
+ */
+const MAX_CONCURRENT = Math.max(
+    1,
+    Number(process.env.MAX_CONCURRENT_RUNS) || Math.max(1, availableParallelism() - 1),
+);
 
 export class ActorInputError extends Error {
     constructor(
@@ -57,7 +69,15 @@ const OUTCOME_STATUS: Record<SpawnOutcome, RunStatus> = {
 export class Runtime {
     private readonly runs = new Map<string, RunRecord>();
     private readonly handles = new Map<string, SpawnHandle>();
+    private readonly slots = new Semaphore(MAX_CONCURRENT);
+    /** Runs cancelled while still queued, which have no process to signal yet. */
+    private readonly cancelled = new Set<string>();
     private loaded = false;
+
+    /** Live capacity, for diagnostics and the health endpoint. */
+    capacity(): { limit: number; running: number; queued: number } {
+        return { limit: this.slots.capacity, running: this.slots.inUse, queued: this.slots.queued };
+    }
 
     /** Reads persisted history. Safe to call repeatedly; only the first reads. */
     async load(): Promise<void> {
@@ -108,8 +128,19 @@ export class Runtime {
      */
     abort(runId: string): boolean {
         const record = this.runs.get(runId);
+        if (!record || isTerminal(record.status)) return false;
+
+        // A queued run has no process to signal yet. Marking it means it exits
+        // the moment a slot frees, instead of starting work nobody wants and
+        // then being killed — which would waste the slot it was waiting for.
+        if (record.status === 'READY') {
+            this.cancelled.add(runId);
+            record.status = 'ABORTING';
+            return true;
+        }
+
         const handle = this.handles.get(runId);
-        if (!record || !handle || isTerminal(record.status)) return false;
+        if (!handle) return false;
 
         record.status = 'ABORTING';
         handle.abort();
@@ -149,6 +180,23 @@ export class Runtime {
         this.runs.set(id, record);
         void this.emit('ACTOR.RUN.CREATED', record);
 
+        // READY is not decorative: the run exists and is waiting for a slot,
+        // which is exactly what Apify's READY means. A caller polling it can
+        // tell "queued" from "running" rather than seeing a silent stall.
+        const release = await this.slots.acquire();
+
+        // Cancelled while it waited: give the slot straight back.
+        if (this.cancelled.delete(id)) {
+            release();
+            record.status = 'ABORTED';
+            record.errorMessage = 'aborted before it started';
+            record.finishedAt = new Date().toISOString();
+            record.durationMs = Date.now() - startedAt;
+            await this.persist();
+            void this.emit('ACTOR.RUN.ABORTED', record);
+            return record;
+        }
+
         // The Actor runs in its own process. The parent never imports Actor
         // code, so a crash, an out-of-memory kill, or a synchronous loop that
         // no AbortController could interrupt ends the child alone rather than
@@ -187,6 +235,7 @@ export class Runtime {
             // parent's running tally, which a killed child can leave stale.
             record.itemCount = outcome.itemCount;
         } finally {
+            release();
             this.handles.delete(id);
             record.finishedAt = new Date().toISOString();
             record.durationMs = Date.now() - startedAt;

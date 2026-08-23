@@ -3,7 +3,8 @@ import { resolveActorName } from './aliases.js';
 import { CONTENT_TYPES, EXPORT_FORMATS, exportItems, type ExportFormat } from './export.js';
 import { ActorInputError, type Runtime } from './runtime.js';
 import { ActorIndex } from './registry.js';
-import { openDataset, openKeyValueStore } from './storage.js';
+import { deleteSchedule, loadSchedules, saveSchedule, type Scheduler } from './schedules.js';
+import { listStorages, openDataset, openKeyValueStore } from './storage.js';
 import { loadTasks, runTask, saveTask, deleteTask } from './tasks.js';
 import type { ActorManifest } from './types.js';
 
@@ -78,6 +79,7 @@ function csvParam(value: string | null): string[] | undefined {
 export interface RestDeps {
     runtime: Runtime;
     index: ActorIndex;
+    scheduler?: Scheduler;
 }
 
 /**
@@ -237,6 +239,45 @@ export async function handleRest(req: IncomingMessage, res: ServerResponse, deps
             return true;
         }
 
+        // GET /v2/datasets
+        if (segments[0] === 'datasets' && segments.length === 1 && method === 'GET') {
+            const names = await listStorages('datasets');
+            json(res, 200, { data: { total: names.length, items: names.map((id) => ({ id })) } });
+            return true;
+        }
+
+        // GET /v2/key-value-stores
+        if (segments[0] === 'key-value-stores' && segments.length === 1 && method === 'GET') {
+            const names = await listStorages('key_value_stores');
+            json(res, 200, { data: { total: names.length, items: names.map((id) => ({ id })) } });
+            return true;
+        }
+
+        // GET /v2/request-queues
+        if (segments[0] === 'request-queues' && segments.length === 1 && method === 'GET') {
+            const names = await listStorages('request_queues');
+            json(res, 200, { data: { total: names.length, items: names.map((id) => ({ id })) } });
+            return true;
+        }
+
+        // PUT/DELETE /v2/key-value-stores/:storeId/records/:key
+        if (segments[0] === 'key-value-stores' && segments[2] === 'records' && segments[3] && method !== 'GET') {
+            const key = segments.slice(3).join('/');
+            const store = await openKeyValueStore(segments[1]);
+
+            if (method === 'PUT') {
+                await store.setValue(key, await readBody(req));
+                json(res, 200, { data: { storeId: segments[1], key, written: true } });
+                return true;
+            }
+            if (method === 'DELETE') {
+                // Crawlee deletes a record by writing null to it.
+                await store.setValue(key, null);
+                json(res, 200, { data: { storeId: segments[1], key, deleted: true } });
+                return true;
+            }
+        }
+
         // GET /v2/datasets/:datasetId
         if (segments[0] === 'datasets' && segments.length === 2 && method === 'GET') {
             try {
@@ -299,6 +340,50 @@ export async function handleRest(req: IncomingMessage, res: ServerResponse, deps
                         return fail(res, 400, err.message, { errors: err.errors }), true;
                     }
                     return fail(res, 404, (err as Error).message), true;
+                }
+                return true;
+            }
+        }
+
+        // GET/POST /v2/schedules, DELETE /v2/schedules/:id, POST /v2/schedules/:id/run
+        if (segments[0] === 'schedules') {
+            if (segments.length === 1 && method === 'GET') {
+                const schedules = await loadSchedules();
+                json(res, 200, { data: { total: schedules.length, items: schedules } });
+                return true;
+            }
+            if (segments.length === 1 && method === 'POST') {
+                try {
+                    json(res, 201, { data: await saveSchedule((await readBody(req)) as Record<string, unknown>) });
+                } catch (err) {
+                    return fail(res, 400, (err as Error).message), true;
+                }
+                return true;
+            }
+            if (segments.length === 2 && method === 'DELETE') {
+                const removed = await deleteSchedule(segments[1]);
+                if (!removed) return fail(res, 404, `Schedule "${segments[1]}" not found.`), true;
+                json(res, 200, { data: { id: segments[1], deleted: true } });
+                return true;
+            }
+            // Fire a schedule now, without waiting for its next slot.
+            if (segments[2] === 'run' && method === 'POST') {
+                const schedule = (await loadSchedules()).find((s) => s.id === segments[1]);
+                if (!schedule) return fail(res, 404, `Schedule "${segments[1]}" not found.`), true;
+
+                const manifest = schedule.actor ? await findActor(schedule.actor) : undefined;
+                if (schedule.actor && !manifest) {
+                    return fail(res, 409, `Actor "${schedule.actor}" is not installed.`), true;
+                }
+                try {
+                    const record = schedule.task
+                        ? await runTask(schedule.task, schedule.input ?? {}, runtime, (name) =>
+                              index.find(name, resolveActorName),
+                          )
+                        : await runtime.call(manifest!, schedule.input ?? {}, { origin: 'SCHEDULER' });
+                    json(res, 201, { data: record });
+                } catch (err) {
+                    return fail(res, 409, (err as Error).message), true;
                 }
                 return true;
             }

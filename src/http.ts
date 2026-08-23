@@ -5,6 +5,8 @@ import { createServer } from './create-server.js';
 import { ActorIndex, discoverActors } from './registry.js';
 import { getProxyConfiguration } from './proxy.js';
 import { handleRest } from './rest.js';
+import { resolveActorName } from './aliases.js';
+import { Scheduler } from './schedules.js';
 import { Runtime } from './runtime.js';
 import { configureStorage } from './storage.js';
 
@@ -23,6 +25,11 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN ?? null;
  */
 const runtime = new Runtime();
 const index = new ActorIndex();
+const scheduler = new Scheduler({
+    runtime,
+    resolveActor: (name) => index.find(name, resolveActorName),
+    refresh: () => index.refresh(),
+});
 
 function unauthorized(res: ServerResponse): void {
     res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' });
@@ -43,6 +50,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
                 // credentials, which would otherwise leak from an endpoint
                 // that exists to be curl'd.
                 proxy: proxies?.enabled ? { enabled: true, ...proxies.stats() } : { enabled: false },
+                runs: runtime.capacity(),
             }),
         );
         return;
@@ -58,7 +66,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     }
 
     // REST first; it reports whether the path was its own.
-    if (await handleRest(req, res, { runtime, index })) return;
+    if (await handleRest(req, res, { runtime, index, scheduler })) return;
 
     if (url.pathname !== '/mcp') {
         res.writeHead(404, { 'content-type': 'application/json' });
@@ -94,6 +102,7 @@ createHttpServer((req, res) => {
     // started by a previous process or by the scheduler.
     await runtime.load();
     await index.refresh();
+    scheduler.start();
     console.log(`[openactors] http listening on :${PORT} — MCP at /mcp, REST at /v2, health at /health`);
     if (!AUTH_TOKEN) {
         console.warn('[openactors] WARNING: AUTH_TOKEN is not set. Do not expose this port beyond localhost.');

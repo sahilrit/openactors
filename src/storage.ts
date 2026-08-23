@@ -32,3 +32,19 @@ export async function openKeyValueStore(name: string): Promise<KeyValueStore> {
 }
 
 export { Dataset, KeyValueStore };
+
+/**
+ * Lists storages by reading the storage directory.
+ *
+ * Crawlee has no listing API — it opens storages by name and nothing more — so
+ * the directory is the only source of truth for what exists. Reading it also
+ * picks up storages written by a previous process, which an in-memory registry
+ * would miss.
+ */
+export async function listStorages(kind: 'datasets' | 'key_value_stores' | 'request_queues'): Promise<string[]> {
+    const { readdir } = await import('node:fs/promises');
+    const root = process.env.CRAWLEE_STORAGE_DIR ?? resolve(PROJECT_ROOT, 'storage');
+
+    const entries = await readdir(resolve(root, kind), { withFileTypes: true }).catch(() => []);
+    return entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+}

@@ -292,6 +292,31 @@ and settles it faster.
 
 ## Scheduling
 
+Two ways, and the in-app one is now the default recommendation.
+
+### In-app schedules
+
+Managed over REST or MCP and run by the server itself, so they are portable,
+inspectable and editable from a client:
+
+```bash
+curl -X POST localhost:8080/v2/schedules -H "Authorization: Bearer $TOKEN" \
+  -d '{"id":"jobs-6h","cron":"0 */6 * * *","task":"remote-growth","timezone":"Asia/Kolkata"}'
+```
+
+A schedule points at either an Actor with inline `input`, or a saved task. The
+cron expression is validated when the schedule is saved rather than when it
+fires — a schedule that silently never runs is far harder to notice than one
+that refuses to be created. `nextRunAt` is written *before* the run starts, so a
+run that overruns its interval cannot be started twice.
+
+### launchd (macOS)
+
+Still supported for the digest specifically, since it survives reboots without
+the server running:
+
+
+
 ```bash
 ./scripts/schedule.sh install                      # daily at 08:00
 DIGEST_EVERY_HOURS=6 ./scripts/schedule.sh install # 00:00, 06:00, 12:00, 18:00
@@ -374,7 +399,39 @@ session count — never the credentials.
 $1–4/GB. Only `maps/google-maps` at volume and heavy crawling need it; the ATS
 job APIs, LinkedIn's public endpoint and ordinary site crawling do not.
 
+## Limits and housekeeping
+
+**Concurrency.** Runs are capped at `MAX_CONCURRENT_RUNS` (default: one less
+than the core count). This became necessary the moment Actors moved into child
+processes — each run is a real OS process with its own heap, so an unbounded
+burst exhausts the machine rather than merely slowing it. Queued runs sit in
+`READY`, which is exactly what that state means, so a client polling can tell
+"queued" from "running". A run aborted while still queued gives its slot
+straight back rather than starting work nobody wants.
+
+**Storage retention.** Every run creates a dataset, so they accumulate — a few
+hundred within a day of ordinary use. `clean-up-storage` (MCP) removes storages
+past a retention window; stores holding configuration are never touched. It
+defaults to a dry run, because a cleanup that deletes on first acquaintance is
+a trap.
+
 ## Notes on fragility
+
+## Limits and housekeeping
+
+**Concurrency.** Runs are capped at `MAX_CONCURRENT_RUNS` (default: one less
+than the core count). This became necessary the moment Actors moved into child
+processes — each run is a real OS process with its own heap, so an unbounded
+burst exhausts the machine rather than merely slowing it. Queued runs sit in
+`READY`, which is exactly what that state means, so a client polling can tell
+"queued" from "running". A run aborted while still queued gives its slot
+straight back rather than starting work nobody wants.
+
+**Storage retention.** Every run creates a dataset, so they accumulate — a few
+hundred within a day of ordinary use. `clean-up-storage` (MCP) removes storages
+past a retention window; stores holding configuration are never touched. It
+defaults to a dry run, because a cleanup that deletes on first acquaintance is
+a trap.
 
 ## Notes on fragility
 

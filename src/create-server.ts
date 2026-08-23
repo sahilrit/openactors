@@ -4,6 +4,7 @@ import { Runtime } from './runtime.js';
 import { registerActorTools } from './tools/actors.js';
 import { registerRunTools } from './tools/runs.js';
 import { registerStorageTools } from './tools/storage.js';
+import { registerScheduleTools } from './tools/schedules.js';
 import { registerTaskTools } from './tools/tasks.js';
 
 const INSTRUCTIONS =
@@ -31,6 +32,7 @@ export async function createServer(runtime: Runtime): Promise<McpServer> {
     registerRunTools(server, runtime);
     registerStorageTools(server);
     registerTaskTools(server, index, runtime);
+    registerScheduleTools(server);
 
     return server;
 }

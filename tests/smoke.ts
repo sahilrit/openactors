@@ -34,13 +34,14 @@ await client.connect(
 
 const { tools } = await client.listTools();
 const names = tools.map((t) => t.name).sort();
-check('tools registered', names.length === 16, `${names.length}: ${names.join(', ')}`);
+check('tools registered', names.length === 20, `${names.length}: ${names.join(', ')}`);
 check(
     'Apify-compatible tool names',
     ['call-actor', 'fetch-actor-details', 'get-dataset-items', 'search-actors', 'get-actor-run',
      'get-actor-log', 'abort-actor-run', 'get-dataset', 'get-dataset-schema',
      'get-key-value-store-record', 'get-actor-run-list', 'create-actor-task', 'get-actor-task',
-     'delete-actor-task', 'run-actor-task', 'resurrect-actor-run'].every((n) => names.includes(n)),
+     'delete-actor-task', 'run-actor-task', 'resurrect-actor-run', 'create-schedule',
+     'get-schedules', 'delete-schedule', 'clean-up-storage'].every((n) => names.includes(n)),
 );
 
 const search = payload(await client.callTool({ name: 'search-actors', arguments: { search: 'markdown crawl' } }));
@@ -333,6 +334,50 @@ check('resurrected run is marked as such', revived.origin === 'RESURRECTION', re
 
 const cleaned = await client.callTool({ name: 'delete-actor-task', arguments: { id: 'smoke-task' } });
 check('task deleted', cleaned.isError !== true);
+
+// --- any-language Actors -----------------------------------------------------
+console.log('\n… python actor\n');
+const py = payload(
+    await client.callTool({
+        name: 'call-actor',
+        arguments: {
+            actor: 'web/rss-reader',
+            input: { feedUrls: ['https://crawlee.dev/blog/rss.xml', 'https://not-a-real-feed.invalid/x'], maxPerFeed: 3 },
+            timeoutSecs: 120,
+        },
+    }),
+);
+check('a Python Actor runs through the same pipeline', py.status === 'SUCCEEDED' && py.itemCount >= 1,
+    `${py.status} itemCount=${py.itemCount} ${py.error ?? ''}`);
+check('its items are structured, not raw text',
+    (py.items ?? []).every((i: any) => typeof i.title === 'string' && 'link' in i));
+
+const pyLog = payload(await client.callTool({ name: 'get-actor-log', arguments: { runId: py.runId } }));
+check('one unreachable feed does not fail the run', /FAILED .*invalid/.test(String(pyLog)),
+    String(pyLog).split('\n').find((l: string) => l.includes('FAILED'))?.slice(24, 90));
+
+// --- schedules ---------------------------------------------------------------
+const sched = payload(await client.callTool({
+    name: 'create-schedule',
+    arguments: { id: 'smoke-schedule', cron: '0 */6 * * *', actor: 'jobs/ats-boards', input: { boards: ['ashby:linear'] } },
+}));
+check('schedule created with a computed next run', sched.id === 'smoke-schedule' && Boolean(sched.nextRunAt), sched.nextRunAt);
+
+const badCron = await client.callTool({
+    name: 'create-schedule', arguments: { id: 'smoke-bad', cron: 'every tuesday', actor: 'jobs/ats-boards' },
+});
+check('an unparseable cron is refused at creation', badCron.isError === true,
+    String((badCron as any).content[0].text).slice(0, 70));
+
+const listed = payload(await client.callTool({ name: 'get-schedules', arguments: {} }));
+check('schedule is listed', (listed.schedules ?? []).some((s: any) => s.id === 'smoke-schedule'));
+check('schedule cleaned up',
+    (await client.callTool({ name: 'delete-schedule', arguments: { id: 'smoke-schedule' } })).isError !== true);
+
+// --- storage retention -------------------------------------------------------
+const swept = payload(await client.callTool({ name: 'clean-up-storage', arguments: { keepDays: 365, dryRun: true } }));
+check('a dry run reports without deleting', swept.dryRun === true && swept.removedCount === 0,
+    `removed=${swept.removedCount} kept=${swept.keptCount}`);
 
 await client.close();
 console.log(`\n${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
