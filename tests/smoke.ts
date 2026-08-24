@@ -34,14 +34,15 @@ await client.connect(
 
 const { tools } = await client.listTools();
 const names = tools.map((t) => t.name).sort();
-check('tools registered', names.length === 20, `${names.length}: ${names.join(', ')}`);
+check('tools registered', names.length === 23, `${names.length}: ${names.join(', ')}`);
 check(
     'Apify-compatible tool names',
     ['call-actor', 'fetch-actor-details', 'get-dataset-items', 'search-actors', 'get-actor-run',
      'get-actor-log', 'abort-actor-run', 'get-dataset', 'get-dataset-schema',
      'get-key-value-store-record', 'get-actor-run-list', 'create-actor-task', 'get-actor-task',
      'delete-actor-task', 'run-actor-task', 'resurrect-actor-run', 'create-schedule',
-     'get-schedules', 'delete-schedule', 'clean-up-storage'].every((n) => names.includes(n)),
+     'get-schedules', 'delete-schedule', 'clean-up-storage', 'mark-job', 'get-marked-jobs',
+     'unmark-job'].every((n) => names.includes(n)),
 );
 
 const search = payload(await client.callTool({ name: 'search-actors', arguments: { search: 'markdown crawl' } }));
