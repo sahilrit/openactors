@@ -127,8 +127,16 @@ export async function handleRest(req: IncomingMessage, res: ServerResponse, deps
                 ? parseIntParam(url.searchParams.get('memory'), 2048, 128, 16384)
                 : undefined;
 
+            // waitForFinish=0 starts the run and returns immediately, matching
+            // Apify's parameter of the same name.
+            const waitSecs = url.searchParams.has('waitForFinish')
+                ? parseIntParam(url.searchParams.get('waitForFinish'), 60, 0, 600)
+                : 60;
+
             try {
-                const record = await runtime.call(actor, input, { timeoutSecs, memoryMbytes, origin: 'API' });
+                let record = await runtime.start(actor, input, { timeoutSecs, memoryMbytes, origin: 'API' });
+                const settled = await runtime.waitFor(record.id, waitSecs * 1000);
+                if (settled) record = settled;
                 // 201: a run resource was created, whatever its outcome.
                 json(res, 201, { data: record });
             } catch (err) {

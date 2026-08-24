@@ -85,3 +85,44 @@ describe('run metrics', () => {
         expect(record.computeUnits).toBeGreaterThan(0);
     }, 60_000);
 });
+
+describe('asynchronous runs', () => {
+    it('returns a run that is still going, rather than blocking on it', async () => {
+        // The reason this exists: an MCP client gives up after 60 seconds, so a
+        // long crawl has to be startable without being waited on.
+        const runtime = runtimeWithFixtures();
+        const record = await runtime.start(manifest('slow-abortable'), {}, { timeoutSecs: 60 });
+
+        expect(record.id).toMatch(/^run-/);
+        expect(['READY', 'RUNNING']).toContain(record.status);
+
+        const finished = await runtime.waitFor(record.id, 60_000);
+        expect(finished?.status).toBe('SUCCEEDED');
+    }, 90_000);
+
+    it('waitFor returns the run unfinished when the wait runs out', async () => {
+        const runtime = runtimeWithFixtures();
+        const record = await runtime.start(manifest('slow-abortable'), {}, { timeoutSecs: 60 });
+
+        // Too short to complete: the caller gets progress, not a false result.
+        const partial = await runtime.waitFor(record.id, 300);
+        expect(partial).toBeDefined();
+        expect(['READY', 'RUNNING']).toContain(partial!.status);
+
+        runtime.abort(record.id);
+        await runtime.waitFor(record.id, 30_000);
+    }, 90_000);
+
+    it('a run started asynchronously still lands in history and its dataset', async () => {
+        const runtime = runtimeWithFixtures();
+        const record = await runtime.start(manifest('ok'), { n: 3 }, { timeoutSecs: 60 });
+        const finished = await runtime.waitFor(record.id, 60_000);
+
+        expect(finished?.itemCount).toBe(3);
+        expect(runtime.getRun(record.id)?.status).toBe('SUCCEEDED');
+    }, 90_000);
+
+    it('waitFor on an unknown run reports nothing rather than hanging', async () => {
+        expect(await runtimeWithFixtures().waitFor('run-does-not-exist', 1000)).toBeUndefined();
+    });
+});

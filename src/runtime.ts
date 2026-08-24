@@ -83,6 +83,8 @@ export class Runtime {
     private readonly slots: Semaphore;
     /** Runs cancelled while still queued, which have no process to signal yet. */
     private readonly cancelled = new Set<string>();
+    /** In-flight runs, so a caller can wait on one it did not start. */
+    private readonly inFlight = new Map<string, Promise<RunRecord>>();
     private loaded = false;
 
     /**
@@ -169,7 +171,24 @@ export class Runtime {
         return true;
     }
 
+    /**
+     * Starts a run and waits for it. Unchanged behaviour for every existing
+     * caller; `start` is the same work without the waiting.
+     */
     async call(manifest: ActorManifest, rawInput: unknown, options: CallOptions = {}): Promise<RunRecord> {
+        const record = await this.start(manifest, rawInput, options);
+        return (await this.waitFor(record.id)) ?? record;
+    }
+
+    /**
+     * Starts a run and returns as soon as it has an id.
+     *
+     * An MCP client abandons a request after about a minute, so a crawl that
+     * takes longer cannot be waited on over that transport at all. Returning
+     * the run lets the caller poll `get-actor-run` instead of the request
+     * dying while the work carries on invisibly.
+     */
+    async start(manifest: ActorManifest, rawInput: unknown, options: CallOptions = {}): Promise<RunRecord> {
         await this.load();
 
         if (manifest.gatedReason) {
@@ -201,6 +220,48 @@ export class Runtime {
         };
         this.runs.set(id, record);
         void this.emit('ACTOR.RUN.CREATED', record);
+
+        // The work runs detached; `waitFor` is how anyone joins it.
+        const work = this.execute(record, manifest, input, timeoutSecs, startedAt, options);
+        this.inFlight.set(id, work);
+        void work.finally(() => this.inFlight.delete(id));
+
+        return record;
+    }
+
+    /**
+     * Resolves when the run finishes, or when `timeoutMs` elapses — in which
+     * case the run is returned as it currently stands rather than as finished.
+     */
+    async waitFor(runId: string, timeoutMs?: number): Promise<RunRecord | undefined> {
+        const record = this.runs.get(runId);
+        if (!record) return undefined;
+
+        const work = this.inFlight.get(runId);
+        if (!work) return record;
+
+        if (timeoutMs === undefined) return work;
+
+        // Losing the race returns progress, not a false result.
+        let timer: NodeJS.Timeout;
+        const expiry = new Promise<undefined>((resolve) => {
+            timer = setTimeout(() => resolve(undefined), timeoutMs);
+        });
+        const result = await Promise.race([work, expiry]);
+        clearTimeout(timer!);
+
+        return result ?? this.runs.get(runId);
+    }
+
+    private async execute(
+        record: RunRecord,
+        manifest: ActorManifest,
+        input: Record<string, unknown>,
+        timeoutSecs: number,
+        startedAt: number,
+        options: CallOptions,
+    ): Promise<RunRecord> {
+        const id = record.id;
 
         // READY is not decorative: the run exists and is waiting for a slot,
         // which is exactly what Apify's READY means. A caller polling it can

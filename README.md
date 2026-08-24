@@ -95,12 +95,26 @@ lets the Actor count grow without bloating the tool list.
 | `search-actors` | Find an Actor by keyword |
 | `fetch-actor-details` | Read its input JSON Schema |
 | `call-actor` | Run it; returns a preview plus a `datasetId` |
+| | `waitSecs` controls how long to wait — see below |
 | `get-actor-run` / `get-actor-run-list` | Status and history of runs |
 | `get-actor-log` | Per-item failures that didn't fail the whole run |
 | `abort-actor-run` | Stop a run in progress; keeps what it collected |
 | `get-dataset-items` | Page through results, optionally projecting fields |
 | `get-dataset` / `get-dataset-schema` | Item count; inferred field shape |
 | `get-key-value-store-record` | Read a stored record by key |
+
+### Long runs
+
+MCP clients abandon a request after about sixty seconds, which is far short of
+a crawl that reads a page per item. `call-actor` therefore *starts* a run and
+waits only `waitSecs` for it (default 50, under that limit). If the run is
+still going you get the `runId` back with `stillRunning: true`, and poll
+`get-actor-run` until it finishes, then read results with `get-dataset-items`.
+`waitSecs: 0` returns immediately.
+
+This matters more than it sounds: without it, the request dies while the work
+carries on invisibly, and nobody is holding the id needed to find it again.
+Over REST the same control is `?waitForFinish=`, matching Apify's parameter.
 
 Tool results are capped at a character budget and tell you how to page for the
 rest, because a scraped page can be tens of thousands of characters and a tool

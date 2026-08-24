@@ -4,7 +4,7 @@ import { type ActorIndex, searchActors } from '../registry.js';
 import type { Runtime } from '../runtime.js';
 import { openDataset } from '../storage.js';
 import { resolveActorName } from '../aliases.js';
-import type { ActorManifest } from '../types.js';
+import { isTerminal, type ActorManifest } from '../types.js';
 import { fail, previewItems, text } from './shared.js';
 
 function describe(actor: ActorManifest) {
@@ -71,6 +71,18 @@ export function registerActorTools(server: McpServer, index: ActorIndex, runtime
                 actor: z.string().describe('Actor id, e.g. "jobs/ats-boards".'),
                 input: z.record(z.string(), z.unknown()).default({}).describe("The Actor's input object."),
                 timeoutSecs: z.number().int().min(5).max(900).default(120),
+                waitSecs: z
+                    .number()
+                    .int()
+                    .min(0)
+                    .max(600)
+                    .default(50)
+                    .describe(
+                        'How long to wait for the run before returning. If it is still going, you get ' +
+                            'the runId and can poll get-actor-run, then read results with get-dataset-items. ' +
+                            'The default sits under the 60-second request timeout most MCP clients use — ' +
+                            'set 0 to start a long crawl and return immediately.',
+                    ),
                 memoryMbytes: z
                     .number()
                     .int()
@@ -80,18 +92,38 @@ export function registerActorTools(server: McpServer, index: ActorIndex, runtime
                     .describe('Heap ceiling for the Actor process. Raise it for a large crawl; a run that exceeds it is killed rather than exhausting the machine.'),
             },
         },
-        async ({ actor, input, timeoutSecs, memoryMbytes }) => {
+        async ({ actor, input, timeoutSecs, waitSecs, memoryMbytes }) => {
             const manifest = index.find(actor, resolveActorName);
             if (!manifest) return fail(`Actor "${actor}" not found. Available: ${index.names()}`);
 
             let record;
             try {
-                record = await runtime.call(manifest, input, { timeoutSecs, memoryMbytes, origin: 'MCP' });
+                // Started rather than awaited: a crawl can outlast the client's
+                // request timeout, and a request that dies mid-run leaves the
+                // work running with nobody holding the runId.
+                record = await runtime.start(manifest, input, { timeoutSecs, memoryMbytes, origin: 'MCP' });
+                const settled = await runtime.waitFor(record.id, waitSecs * 1000);
+                if (settled) record = settled;
             } catch (err) {
                 // Input validation failures read as a list of specific problems
                 // rather than a stack trace, so an agent can correct the call
                 // instead of guessing at it.
                 return fail(`Could not start "${manifest.name}": ${(err as Error).message}`);
+            }
+
+            if (!isTerminal(record.status)) {
+                return text({
+                    runId: record.id,
+                    actor: record.actorName,
+                    status: record.status,
+                    itemCount: record.itemCount,
+                    datasetId: record.defaultDatasetId,
+                    stillRunning: true,
+                    note:
+                        `Still running after ${waitSecs}s. Poll get-actor-run with runId "${record.id}" until ` +
+                        `status is SUCCEEDED, then read results with get-dataset-items using datasetId ` +
+                        `"${record.defaultDatasetId}". get-actor-log shows progress meanwhile.`,
+                });
             }
 
             const dataset = await openDataset(record.defaultDatasetId);

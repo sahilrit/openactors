@@ -1,0 +1,29 @@
+{
+  "title": "Verify Remote Claim",
+  "description": "Takes job URLs and checks what each posting actually says about where the work happens. A job board's remote filter is a tag, not a fact — postings tagged remote routinely turn out to be hybrid or office-based once you read them. Returns remote / hybrid / onsite / unclear for each, with the exact phrase the verdict rests on so you can check it rather than trust it.",
+  "tags": ["jobs", "remote", "verify", "hybrid", "workplace", "linkedin"],
+  "input": {
+    "type": "object",
+    "properties": {
+      "urls": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Job posting URLs. LinkedIn job links are supported directly."
+      },
+      "keepVerdicts": {
+        "type": "array",
+        "items": { "type": "string", "enum": ["remote", "hybrid", "onsite", "unclear"] },
+        "description": "Only return postings with these verdicts. Omit to return all of them."
+      },
+      "maxConcurrent": {
+        "type": "integer",
+        "description": "Postings fetched at once. Kept low on purpose — this reads one page per role.",
+        "default": 3,
+        "minimum": 1,
+        "maximum": 8
+      }
+    },
+    "required": ["urls"],
+    "additionalProperties": false
+  }
+}
