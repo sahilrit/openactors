@@ -12,6 +12,7 @@ interface Input {
     maxPerBoard?: number;
     eligibleFrom?: string;
     includeUnknownEligibility?: boolean;
+    excludeRestricted?: boolean;
 }
 
 const FETCH_TIMEOUT_MS = 25_000;
@@ -34,6 +35,7 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
         maxPerBoard = 200,
         eligibleFrom,
         includeUnknownEligibility = true,
+        excludeRestricted = true,
     } = input;
 
     if (!Array.isArray(boards) || boards.length === 0) {
@@ -110,7 +112,10 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
                 // Unknown is kept by default. Most postings say only "Remote"
                 // with the restriction, if any, buried in the description —
                 // dropping them silently would hide real opportunities.
-                if (verdict.eligibility === 'restricted') continue;
+                // Labelling and filtering are separate decisions. Dropping
+                // every restricted role hides the ones whose posting is
+                // stricter than the employer actually is.
+                if (verdict.eligibility === 'restricted' && excludeRestricted) continue;
                 if (verdict.eligibility === 'unknown' && !includeUnknownEligibility) continue;
                 job.eligibility = verdict.eligibility;
                 job.eligibilityReason = verdict.reason;

@@ -96,3 +96,14 @@ describe('word-boundary hazards', () => {
         expect(classifyEligibility('Anywhere', 'IN').reason).toMatch(/worldwide/);
     });
 });
+
+describe('labelling without filtering', () => {
+    it('is what lets a restricted role still be seen and judged', () => {
+        // Dropping every US-restricted role hides the ones whose posting is
+        // stricter than the employer actually is. Labelling keeps the judgement
+        // with the reader instead of making it silently on their behalf.
+        const verdict = classifyEligibility('Remote U.S.', 'IN');
+        expect(verdict.eligibility).toBe('restricted');
+        expect(verdict.reason).toMatch(/limited to/);
+    });
+});

@@ -73,6 +73,122 @@
       ]
     },
     {
+      "name": "United States \u00b7 performance & growth marketing",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "performance marketing",
+        "location": "United States",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40,
+        "excludeRestricted": false
+      },
+      "display": [
+        "title",
+        "company",
+        "location",
+        "eligibility",
+        "postedAt"
+      ]
+    },
+    {
+      "name": "United States \u00b7 paid media",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "paid media",
+        "location": "United States",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40,
+        "excludeRestricted": false
+      },
+      "display": [
+        "title",
+        "company",
+        "location",
+        "eligibility",
+        "postedAt"
+      ]
+    },
+    {
+      "name": "Europe \u00b7 performance & growth marketing",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "performance marketing",
+        "location": "European Union",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40,
+        "excludeRestricted": false
+      },
+      "display": [
+        "title",
+        "company",
+        "location",
+        "eligibility",
+        "postedAt"
+      ]
+    },
+    {
+      "name": "United Kingdom \u00b7 performance & growth marketing",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "performance marketing",
+        "location": "United Kingdom",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40,
+        "excludeRestricted": false
+      },
+      "display": [
+        "title",
+        "company",
+        "location",
+        "eligibility",
+        "postedAt"
+      ]
+    },
+    {
+      "name": "Remote-first companies \u00b7 all marketing roles (labelled)",
+      "actor": "jobs/ats-boards",
+      "input": {
+        "boards": [
+          "greenhouse:gitlab",
+          "greenhouse:webflow",
+          "greenhouse:cloudflare",
+          "greenhouse:hubspot",
+          "ashby:linear",
+          "ashby:vanta",
+          "ashby:ramp",
+          "ashby:replit",
+          "lever:netflix",
+          "recruitee:channable",
+          "recruitee:hygraph"
+        ],
+        "titleIncludes": [
+          "performance marketing",
+          "growth marketing",
+          "paid media",
+          "demand generation",
+          "paid acquisition",
+          "lifecycle marketing"
+        ],
+        "eligibleFrom": "IN",
+        "excludeRestricted": false
+      },
+      "display": [
+        "title",
+        "account",
+        "location",
+        "eligibility",
+        "publishedAt"
+      ]
+    },
+    {
       "name": "Rare: globally-open growth roles at remote-first companies",
       "actor": "jobs/ats-boards",
       "input": {

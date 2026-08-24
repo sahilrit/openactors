@@ -48,6 +48,11 @@
         "type": "boolean",
         "description": "Keep roles whose location gives no region at all (a bare \"Remote\"). On by default: these are the largest group and any restriction is usually buried in the description, so dropping them hides real opportunities. Set false for a stricter, shorter list.",
         "default": true
+      },
+      "excludeRestricted": {
+        "type": "boolean",
+        "description": "Drop roles whose location rules you out. On by default. Set false to keep them, still labelled with `eligibility` and a reason \u2014 useful when you want to see a restricted role and judge it yourself, since a posting is sometimes stricter than the employer.",
+        "default": true
       }
     },
     "required": [

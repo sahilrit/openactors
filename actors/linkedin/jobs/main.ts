@@ -11,6 +11,7 @@ interface Input {
     maxResults?: number;
     eligibleFrom?: string;
     includeUnknownEligibility?: boolean;
+    excludeRestricted?: boolean;
 }
 
 const ENDPOINT = 'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search';
@@ -38,7 +39,13 @@ function searchUrl(input: Input, start: number): string {
 }
 
 export async function run(input: Input, ctx: ActorContext): Promise<void> {
-    const { keywords, maxResults = 50, eligibleFrom, includeUnknownEligibility = true } = input;
+    const {
+        keywords,
+        maxResults = 50,
+        eligibleFrom,
+        includeUnknownEligibility = true,
+        excludeRestricted = true,
+    } = input;
     if (!keywords?.trim()) throw new Error('keywords is required, e.g. "performance marketing manager"');
 
     const seen = new Set<string>();
@@ -91,7 +98,7 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
 
             if (eligibleFrom) {
                 const verdict = classifyEligibility(job.location, eligibleFrom);
-                if (verdict.eligibility === 'restricted') { filtered++; continue; }
+                if (verdict.eligibility === 'restricted' && excludeRestricted) { filtered++; continue; }
                 if (verdict.eligibility === 'unknown' && !includeUnknownEligibility) { filtered++; continue; }
                 row.eligibility = verdict.eligibility;
                 row.eligibilityReason = verdict.reason;

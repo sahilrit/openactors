@@ -169,3 +169,17 @@ describe('malformed input', () => {
         }
     });
 });
+
+
+describe('excludeRestricted', () => {
+    it('is a documented input on the ATS actor', async () => {
+        // Guards the manifest and the implementation against drifting apart:
+        // an input the schema rejects is unusable however well it is coded.
+        const { readFile } = await import('node:fs/promises');
+        const manifest = JSON.parse(
+            await readFile(new URL('../actors/jobs/ats-boards/actor.json', import.meta.url), 'utf8'),
+        );
+        expect(manifest.input.properties.excludeRestricted).toBeDefined();
+        expect(manifest.input.properties.excludeRestricted.default).toBe(true);
+    });
+});
