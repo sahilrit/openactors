@@ -1,0 +1,27 @@
+{
+  "_comment": "Sahil's qualified roles, distilled two ways. LinkedIn takes one keyword string per query, so distinct intents become separate searches; boards and ATS feeds are filtered client-side, so they take the full substring list.",
+
+  "linkedinQueries": [
+    "performance marketing",
+    "media buyer",
+    "paid social",
+    "ppc",
+    "growth marketing",
+    "ecommerce marketing",
+    "user acquisition",
+    "conversion rate optimization",
+    "lifecycle marketing",
+    "shopify marketing"
+  ],
+
+  "titleKeywords": [
+    "performance marketing", "performance marketer", "paid advertising", "paid media", "paid social",
+    "paid search", "ppc", "google ads", "meta ads", "facebook ads", "media buyer", "media buying",
+    "growth marketing", "growth strategist", "growth manager", "digital marketing",
+    "ecommerce marketing", "e-commerce marketing", "ecommerce growth", "e-commerce growth",
+    "dtc", "direct-to-consumer", "d2c", "shopify",
+    "user acquisition", "acquisition manager", "acquisition marketing",
+    "conversion rate", "cro specialist", "funnel", "lead generation", "demand generation",
+    "lifecycle marketing", "retention marketing", "crm marketing", "marketing analytics"
+  ]
+}

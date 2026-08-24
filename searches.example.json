@@ -9,7 +9,7 @@
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 60
+        "maxResults": 40
       },
       "verifyRemote": true,
       "keepVerdicts": [
@@ -22,7 +22,83 @@
         "location",
         "workplace",
         "postedAt"
-      ]
+      ],
+      "timeoutSecs": 300
+    },
+    {
+      "name": "Remote \u00b7 media buyer",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "media buyer",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
+      "display": [
+        "title",
+        "company",
+        "location",
+        "workplace",
+        "postedAt"
+      ],
+      "timeoutSecs": 300
+    },
+    {
+      "name": "Remote \u00b7 paid social",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "paid social",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
+      "display": [
+        "title",
+        "company",
+        "location",
+        "workplace",
+        "postedAt"
+      ],
+      "timeoutSecs": 300
+    },
+    {
+      "name": "Remote \u00b7 ppc",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "ppc",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
+      "display": [
+        "title",
+        "company",
+        "location",
+        "workplace",
+        "postedAt"
+      ],
+      "timeoutSecs": 300
     },
     {
       "name": "Remote \u00b7 growth marketing",
@@ -33,7 +109,7 @@
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 60
+        "maxResults": 40
       },
       "verifyRemote": true,
       "keepVerdicts": [
@@ -46,18 +122,19 @@
         "location",
         "workplace",
         "postedAt"
-      ]
+      ],
+      "timeoutSecs": 300
     },
     {
-      "name": "Remote \u00b7 paid media",
+      "name": "Remote \u00b7 ecommerce marketing",
       "actor": "linkedin/jobs",
       "input": {
-        "keywords": "paid media",
+        "keywords": "ecommerce marketing",
         "location": "India",
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 60
+        "maxResults": 40
       },
       "verifyRemote": true,
       "keepVerdicts": [
@@ -70,18 +147,19 @@
         "location",
         "workplace",
         "postedAt"
-      ]
+      ],
+      "timeoutSecs": 300
     },
     {
-      "name": "Remote \u00b7 meta ads",
+      "name": "Remote \u00b7 user acquisition",
       "actor": "linkedin/jobs",
       "input": {
-        "keywords": "meta ads",
+        "keywords": "user acquisition",
         "location": "India",
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 60
+        "maxResults": 40
       },
       "verifyRemote": true,
       "keepVerdicts": [
@@ -94,10 +172,86 @@
         "location",
         "workplace",
         "postedAt"
-      ]
+      ],
+      "timeoutSecs": 300
     },
     {
-      "name": "Freelance \u00b7 performance & growth marketing",
+      "name": "Remote \u00b7 conversion rate optimization",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "conversion rate optimization",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
+      "display": [
+        "title",
+        "company",
+        "location",
+        "workplace",
+        "postedAt"
+      ],
+      "timeoutSecs": 300
+    },
+    {
+      "name": "Remote \u00b7 lifecycle marketing",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "lifecycle marketing",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
+      "display": [
+        "title",
+        "company",
+        "location",
+        "workplace",
+        "postedAt"
+      ],
+      "timeoutSecs": 300
+    },
+    {
+      "name": "Remote \u00b7 shopify marketing",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "shopify marketing",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
+      "display": [
+        "title",
+        "company",
+        "location",
+        "workplace",
+        "postedAt"
+      ],
+      "timeoutSecs": 300
+    },
+    {
+      "name": "Freelance \u00b7 performance marketing",
       "actor": "linkedin/jobs",
       "input": {
         "keywords": "performance marketing",
@@ -105,7 +259,7 @@
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 60,
+        "maxResults": 30,
         "jobTypes": [
           "freelance",
           "contract",
@@ -124,18 +278,19 @@
         "location",
         "workplace",
         "postedAt"
-      ]
+      ],
+      "timeoutSecs": 300
     },
     {
-      "name": "Freelance \u00b7 paid media and ads",
+      "name": "Freelance \u00b7 media buyer",
       "actor": "linkedin/jobs",
       "input": {
-        "keywords": "paid media",
+        "keywords": "media buyer",
         "location": "India",
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 60,
+        "maxResults": 30,
         "jobTypes": [
           "freelance",
           "contract",
@@ -154,22 +309,24 @@
         "location",
         "workplace",
         "postedAt"
-      ]
+      ],
+      "timeoutSecs": 300
     },
     {
-      "name": "Freelance \u00b7 marketing consultant",
+      "name": "Freelance \u00b7 paid social",
       "actor": "linkedin/jobs",
       "input": {
-        "keywords": "marketing consultant",
+        "keywords": "paid social",
         "location": "India",
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 40,
+        "maxResults": 30,
         "jobTypes": [
           "freelance",
           "contract",
-          "temporary"
+          "temporary",
+          "part-time"
         ]
       },
       "verifyRemote": true,
@@ -183,25 +340,81 @@
         "location",
         "workplace",
         "postedAt"
-      ]
+      ],
+      "timeoutSecs": 300
+    },
+    {
+      "name": "Freelance \u00b7 shopify marketing",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "shopify marketing",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 30,
+        "jobTypes": [
+          "freelance",
+          "contract",
+          "temporary",
+          "part-time"
+        ]
+      },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
+      "display": [
+        "title",
+        "company",
+        "location",
+        "workplace",
+        "postedAt"
+      ],
+      "timeoutSecs": 300
     },
     {
       "name": "Worldwide \u00b7 remote-first boards (open from India)",
       "actor": "jobs/remote-boards",
       "input": {
         "keywords": [
-          "marketing",
-          "growth",
+          "performance marketing",
+          "performance marketer",
+          "paid advertising",
           "paid media",
-          "advertis",
+          "paid social",
+          "paid search",
+          "ppc",
+          "google ads",
+          "meta ads",
+          "facebook ads",
+          "media buyer",
+          "media buying",
+          "growth marketing",
+          "growth strategist",
+          "growth manager",
+          "digital marketing",
+          "ecommerce marketing",
+          "e-commerce marketing",
+          "ecommerce growth",
+          "e-commerce growth",
+          "dtc",
+          "direct-to-consumer",
+          "d2c",
+          "shopify",
+          "user acquisition",
+          "acquisition manager",
+          "acquisition marketing",
+          "conversion rate",
+          "cro specialist",
+          "funnel",
+          "lead generation",
           "demand generation",
-          "performance",
-          "seo",
-          "ecommerce",
-          "crm",
-          "lifecycle",
-          "brand",
-          "content"
+          "lifecycle marketing",
+          "retention marketing",
+          "crm marketing",
+          "marketing analytics"
         ],
         "eligibleFrom": "IN",
         "excludeRestricted": true,
@@ -221,18 +434,42 @@
       "actor": "jobs/remote-boards",
       "input": {
         "keywords": [
-          "marketing",
-          "growth",
+          "performance marketing",
+          "performance marketer",
+          "paid advertising",
           "paid media",
-          "advertis",
+          "paid social",
+          "paid search",
+          "ppc",
+          "google ads",
+          "meta ads",
+          "facebook ads",
+          "media buyer",
+          "media buying",
+          "growth marketing",
+          "growth strategist",
+          "growth manager",
+          "digital marketing",
+          "ecommerce marketing",
+          "e-commerce marketing",
+          "ecommerce growth",
+          "e-commerce growth",
+          "dtc",
+          "direct-to-consumer",
+          "d2c",
+          "shopify",
+          "user acquisition",
+          "acquisition manager",
+          "acquisition marketing",
+          "conversion rate",
+          "cro specialist",
+          "funnel",
+          "lead generation",
           "demand generation",
-          "performance",
-          "seo",
-          "ecommerce",
-          "crm",
-          "lifecycle",
-          "brand",
-          "content"
+          "lifecycle marketing",
+          "retention marketing",
+          "crm marketing",
+          "marketing analytics"
         ],
         "eligibleFrom": "IN",
         "excludeRestricted": false,
@@ -267,11 +504,41 @@
         ],
         "titleIncludes": [
           "performance marketing",
-          "growth marketing",
+          "performance marketer",
+          "paid advertising",
           "paid media",
+          "paid social",
+          "paid search",
+          "ppc",
+          "google ads",
+          "meta ads",
+          "facebook ads",
+          "media buyer",
+          "media buying",
+          "growth marketing",
+          "growth strategist",
+          "growth manager",
+          "digital marketing",
+          "ecommerce marketing",
+          "e-commerce marketing",
+          "ecommerce growth",
+          "e-commerce growth",
+          "dtc",
+          "direct-to-consumer",
+          "d2c",
+          "shopify",
+          "user acquisition",
+          "acquisition manager",
+          "acquisition marketing",
+          "conversion rate",
+          "cro specialist",
+          "funnel",
+          "lead generation",
           "demand generation",
-          "paid acquisition",
-          "lifecycle marketing"
+          "lifecycle marketing",
+          "retention marketing",
+          "crm marketing",
+          "marketing analytics"
         ],
         "eligibleFrom": "IN"
       },
