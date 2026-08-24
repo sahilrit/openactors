@@ -359,6 +359,49 @@ an interrupted run cannot mark items seen that were never reported.
 
 Renaming a search resets its history — names key the state.
 
+### Knowing when a search has broken
+
+A scraper whose target changed returns nothing, and in a digest that is
+indistinguishable from a quiet week — so the digest keeps arriving, keeps
+looking healthy, and keeps saying nothing new for as long as nobody checks.
+
+Each search's total yield is tracked across runs. A collapse to under a fifth
+of normal is flagged at the top of the digest, escalates to `broken` if it
+persists, and makes the run exit non-zero so a scheduler surfaces it.
+
+Three details decide whether this is useful or just noise:
+
+- **Judged on total scraped, not on what is new.** "New" legitimately falls to
+  zero once a search has caught up; total does not.
+- **The baseline is the 75th percentile**, which has to survive two opposite
+  failure modes. A plain median lets a sustained breakage rewrite normal — once
+  the broken runs outnumber the healthy ones it sinks to meet them and the
+  alert vanishes exactly when it matters. Anchoring on the maximum fixes that
+  and hands the baseline to a single freak run, after which everything looks
+  broken.
+- **A search that has never returned anything is never flagged.** The
+  globally-open watch is legitimately empty most days, and alerting on it would
+  train you to ignore the alerts.
+
+### Duplicates and decisions
+
+Several searches legitimately match the same posting — four keyword variants
+over one job market overlap heavily. Roles are deduplicated **across searches
+within a run**, so a job appears once rather than in every section that matched
+it. In practice that is around 30 rows a run here.
+
+Roles you have marked stop appearing at all:
+
+```
+mark-job    urls: [...]  mark: applied | ignored
+get-marked-jobs
+unmark-job  urls: [...]
+```
+
+That is what separates a working list from a feed: without it every role you
+have already decided about comes back forever, and the only record of your own
+decisions is your memory.
+
 **On volume:** LinkedIn returns a rotating sample of a large corpus rather than
 the whole thing, so early runs surface a lot that is technically new to you. It
 settles as the seen-set fills. Narrowing `postedWithinDays` shrinks the corpus

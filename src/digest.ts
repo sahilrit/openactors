@@ -4,10 +4,12 @@ import { join, resolve } from 'node:path';
 
 import { loadConfig, PROJECT_ROOT, type SavedSearch } from './digest/config.js';
 import { diff, loadState, prune, saveState } from './digest/state.js';
+import { assessHealth, recordYield, type HealthVerdict, type SearchHealth } from './digest/health.js';
+import { applyMarks, markKey, type MarkStore } from './digest/marks.js';
 import { inferDisplay, renderHtml, renderMarkdown, type SearchResult } from './digest/render.js';
 import { discoverActors } from './registry.js';
 import { Runtime } from './runtime.js';
-import { configureStorage, openDataset } from './storage.js';
+import { configureStorage, openDataset, openKeyValueStore } from './storage.js';
 import { resolveActorName } from './aliases.js';
 
 /** Read back in pages; a broad search can return more than one page holds. */
@@ -59,6 +61,18 @@ async function main(): Promise<void> {
     const runtime = new Runtime();
     await runtime.load();
 
+    const marksStore = await openKeyValueStore('job-marks');
+    const marks = (await marksStore.getValue<MarkStore>('marks')) ?? {};
+
+    const healthStore = await openKeyValueStore('digest-health');
+    const health = (await healthStore.getValue<Record<string, SearchHealth>>('health')) ?? {};
+
+    // Roles seen earlier in *this* run. Several searches legitimately match the
+    // same posting, and showing it once per section is noise rather than signal.
+    const seenThisRun = new Set<string>();
+    let duplicatesSuppressed = 0;
+    let markedSuppressed = 0;
+
     const installed = await discoverActors();
     runtime.resolveActor = (name) => installed.find((a) => a.name === resolveActorName(name));
     const state = await loadState();
@@ -91,6 +105,32 @@ async function main(): Promise<void> {
             continue;
         }
 
+        // Health is judged on everything scraped, not on what survived the
+        // filters: "new" legitimately falls to zero, total does not.
+        const scrapedTotal = result.fresh.length;
+        const priorHealth = health[search.name] ?? { yields: [], lastTotal: 0 };
+        const verdict = assessHealth(priorHealth, scrapedTotal);
+        health[search.name] = recordYield(priorHealth, scrapedTotal);
+
+        if (verdict.status !== 'ok') {
+            console.error(`[digest]   ${verdict.status.toUpperCase()}: ${verdict.reason}`);
+        }
+
+        const afterMarks = applyMarks(result.fresh, marks);
+        markedSuppressed += afterMarks.removed;
+
+        const deduped = afterMarks.items.filter((item) => {
+            const key = markKey(item);
+            if (key === null) return true;
+            if (seenThisRun.has(key)) {
+                duplicatesSuppressed++;
+                return false;
+            }
+            seenThisRun.add(key);
+            return true;
+        });
+        result = { ...result, fresh: deduped, health: verdict };
+
         const previous = state[search.name];
         const firstRun = previous?.lastRunAt === undefined;
         const { fresh, repeatCount, updatedSeen } = diff(result.fresh, previous?.seen ?? {}, search.key ?? 'url', now);
@@ -106,6 +146,7 @@ async function main(): Promise<void> {
     // State is saved only after every search has been processed, so an
     // interrupted run does not mark items seen that were never reported.
     await saveState(state);
+    await healthStore.setValue('health', health);
 
     const outDir = resolve(PROJECT_ROOT, config.output.dir);
     await mkdir(outDir, { recursive: true });
@@ -129,15 +170,23 @@ async function main(): Promise<void> {
 
     const total = results.reduce((sum, r) => sum + r.fresh.length, 0);
     const failed = results.filter((r) => r.error).length;
+    const unhealthy = results.filter((r) => r.health && r.health.status !== 'ok');
 
     // stdout carries the summary so a scheduler's log is useful on its own.
     console.log(`${total} new result(s)${failed > 0 ? `, ${failed} search(es) failed` : ''} — ${written[0]}`);
+    if (duplicatesSuppressed > 0 || markedSuppressed > 0) {
+        console.log(`  (${duplicatesSuppressed} duplicate, ${markedSuppressed} already-handled row(s) suppressed)`);
+    }
+    for (const r of unhealthy) {
+        console.log(`  ${r.health!.status.toUpperCase()}  ${r.name}: ${r.health!.reason}`);
+    }
     for (const result of results.filter((r) => r.fresh.length > 0)) {
         console.log(`  ${result.fresh.length.toString().padStart(4)}  ${result.name}`);
     }
 
-    // A failed search is worth a non-zero exit so a scheduler can surface it.
-    process.exit(failed > 0 ? 1 : 0);
+    // Both a failed search and a silently-broken one are worth a non-zero exit,
+    // so a scheduler surfaces them rather than logging success either way.
+    process.exit(failed > 0 || unhealthy.some((r) => r.health!.status === 'broken') ? 1 : 0);
 }
 
 main().catch((err) => {

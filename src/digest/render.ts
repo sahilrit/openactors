@@ -1,6 +1,7 @@
 export interface SearchResult {
     name: string;
     actor: string;
+    health?: { status: 'ok' | 'suspicious' | 'broken'; reason: string };
     fresh: Record<string, unknown>[];
     repeatCount: number;
     firstRun: boolean;
@@ -40,6 +41,17 @@ export function renderMarkdown(results: SearchResult[], now: Date): string {
 
     const lines: string[] = [`# Digest — ${date}`, ''];
 
+    // Warnings go first. A search that has quietly stopped working is the one
+    // thing in this document you cannot afford to scroll past.
+    const unhealthy = results.filter((r) => r.health && r.health.status !== 'ok');
+    if (unhealthy.length > 0) {
+        lines.push('> **Check these searches**', '>');
+        for (const r of unhealthy) {
+            lines.push(`> - **${r.name}** — ${r.health!.reason}`);
+        }
+        lines.push('');
+    }
+
     if (total === 0) {
         lines.push('Nothing new since the last run.', '');
     } else {
@@ -57,7 +69,8 @@ export function renderMarkdown(results: SearchResult[], now: Date): string {
             lines.push(`_First run — everything below is new because there is no history to compare against._`, '');
         }
         if (result.fresh.length === 0) {
-            lines.push(`Nothing new. ${result.repeatCount} already-seen result(s).`, '');
+            const note = result.health && result.health.status !== 'ok' ? ` — ${result.health.reason}` : '';
+            lines.push(`Nothing new. ${result.repeatCount} already-seen result(s).${note}`, '');
             continue;
         }
 

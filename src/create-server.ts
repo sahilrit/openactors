@@ -5,6 +5,7 @@ import { Runtime } from './runtime.js';
 import { registerActorTools } from './tools/actors.js';
 import { registerRunTools } from './tools/runs.js';
 import { registerStorageTools } from './tools/storage.js';
+import { registerMarkTools } from './tools/marks.js';
 import { registerScheduleTools } from './tools/schedules.js';
 import { registerTaskTools } from './tools/tasks.js';
 
@@ -38,6 +39,7 @@ export async function createServer(runtime: Runtime): Promise<McpServer> {
     registerStorageTools(server);
     registerTaskTools(server, index, runtime);
     registerScheduleTools(server);
+    registerMarkTools(server);
 
     return server;
 }
