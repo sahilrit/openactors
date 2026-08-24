@@ -194,9 +194,16 @@ not this script's: named tunnels route through a zone you control, and there is
 no free Cloudflare-provided hostname for them. Any domain works, including one
 already on Cloudflare for something else; a subdomain is enough.
 
-`install` registers a launchd agent that starts the tunnel and server at login
-and restarts them if they die, which is what makes the URL genuinely permanent
-rather than merely stable.
+`install` registers two launchd agents — one for the tunnel, one for the server
+— that start at login and restart if they die, which is what makes the URL
+genuinely permanent rather than merely stable.
+
+Two agents invoking their binaries directly, rather than one agent running a
+shell script: macOS denies `/bin/bash` access to `~/Documents`, so a
+shell-based agent dies instantly with "Operation not permitted" while the same
+command works from a terminal. Agent logs go to `~/Library/Logs/openactors/`
+for the same reason — launchd cannot create files in `~/Documents`, and the
+symptom is an agent with a healthy PID and completely empty logs.
 
 **A DNS caveat worth knowing:** some ISP resolvers return NXDOMAIN for
 `*.trycloudflare.com`. Claude is unaffected — it resolves through its own DNS —
