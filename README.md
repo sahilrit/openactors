@@ -373,6 +373,24 @@ an interrupted run cannot mark items seen that were never reported.
 
 Renaming a search resets its history — names key the state.
 
+### Verifying the remote claim
+
+A saved search can set `verifyRemote: true`. Every posting is then opened and
+read before it reaches the digest, and roles whose text contradicts the remote
+tag are dropped — of 242 roles LinkedIn tagged remote here, 74 said otherwise
+in the body.
+
+`keepVerdicts` controls what survives, defaulting to `remote` and `unclear`:
+most postings never state the arrangement, and dropping those would discard the
+majority of the market on the strength of an omission. Verification failing is
+never fatal — the unverified roles still appear, because losing a day's results
+to a broken check is worse than showing a few that turn out to be hybrid.
+
+`jobTypes` restricts to employment types, including `freelance` — which maps
+onto LinkedIn's contract code, since it has no separate freelance category. The
+filter is real but leaky: sampled properly, about a quarter of the contract
+pool also appears under full-time.
+
 ### Knowing when a search has broken
 
 A scraper whose target changed returns nothing, and in a digest that is

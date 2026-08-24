@@ -1,4 +1,5 @@
 import { classifyEligibility } from '../../../src/geo.js';
+import { buildSearchUrl, type JobType } from './query.js';
 import { RateLimiter, fetchText } from '../../../src/fetcher.js';
 import type { ActorContext } from '../../../src/types.js';
 import { parseCards } from './parse.js';
@@ -12,9 +13,8 @@ interface Input {
     eligibleFrom?: string;
     includeUnknownEligibility?: boolean;
     excludeRestricted?: boolean;
+    jobTypes?: JobType[];
 }
-
-const ENDPOINT = 'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search';
 
 /**
  * Three seconds between pages. No account is at risk here, but this is still
@@ -25,18 +25,6 @@ const limiter = new RateLimiter(3000);
 
 /** Bounds the walk when LinkedIn keeps returning pages that add nothing new. */
 const MAX_BARREN_PAGES = 2;
-
-function searchUrl(input: Input, start: number): string {
-    const params = new URLSearchParams({
-        keywords: input.keywords,
-        location: input.location ?? 'Worldwide',
-        start: String(start),
-    });
-    // f_TPR and f_WT are the parameters LinkedIn's own filter UI sets.
-    if (input.postedWithinDays) params.set('f_TPR', `r${input.postedWithinDays * 86_400}`);
-    if (input.remoteOnly) params.set('f_WT', '2');
-    return `${ENDPOINT}?${params.toString()}`;
-}
 
 export async function run(input: Input, ctx: ActorContext): Promise<void> {
     const {
@@ -64,7 +52,7 @@ export async function run(input: Input, ctx: ActorContext): Promise<void> {
         let body: string;
         let status: number;
         try {
-            ({ status, body } = await fetchText(searchUrl(input, start), { signal: ctx.signal, session: ctx.runId }));
+            ({ status, body } = await fetchText(buildSearchUrl(input, start), { signal: ctx.signal, session: ctx.runId }));
         } catch (err) {
             ctx.log(`stopping at start=${start}: ${(err as Error).message}`);
             break;

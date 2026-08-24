@@ -53,6 +53,52 @@ async function runSearch(search: SavedSearch, runtime: Runtime, now: Date): Prom
     return { ...base, fresh: items, display: search.display ?? inferDisplay(items) };
 }
 
+/**
+ * Reads each posting and drops the ones whose text contradicts the remote tag.
+ *
+ * Failures here are deliberately non-fatal: if verification cannot run, the
+ * unverified roles are still reported. Losing a day's results to a broken
+ * check would be a worse outcome than showing a few roles that turn out to be
+ * hybrid.
+ */
+async function verifyRemote(
+    search: SavedSearch,
+    items: Record<string, unknown>[],
+    runtime: Runtime,
+    installed: Awaited<ReturnType<typeof discoverActors>>,
+): Promise<Record<string, unknown>[]> {
+    const manifest = installed.find((a) => a.name === 'jobs/verify-remote');
+    if (!manifest) return items;
+
+    const keep = new Set(search.keepVerdicts ?? ['remote', 'unclear']);
+    const urls = items.map((i) => String(i.url ?? '')).filter((u) => /^https?:/.test(u));
+    if (urls.length === 0) return items;
+
+    try {
+        const run = await runtime.call(manifest, { urls, maxConcurrent: 5 }, {
+            timeoutSecs: Math.min(900, 30 + urls.length * 3),
+            origin: 'SCHEDULER',
+        });
+        if (run.status !== 'SUCCEEDED') return items;
+
+        const dataset = await openDataset(run.defaultDatasetId);
+        const { items: verdicts } = await dataset.getData({ limit: 5000 });
+
+        const byUrl = new Map(verdicts.map((v) => [String(v.url), v]));
+        return items.filter((i) => {
+            const verdict = byUrl.get(String(i.url ?? ''));
+            // Unchecked stays in: absence of a verdict is not evidence against.
+            if (!verdict) return true;
+            (i as Record<string, unknown>).workplace = verdict.verdict;
+            (i as Record<string, unknown>).workplaceEvidence = verdict.evidence;
+            return keep.has(String(verdict.verdict));
+        });
+    } catch (err) {
+        console.error(`[digest]   verification unavailable: ${(err as Error).message}`);
+        return items;
+    }
+}
+
 async function main(): Promise<void> {
     configureStorage();
 
@@ -114,6 +160,14 @@ async function main(): Promise<void> {
 
         if (verdict.status !== 'ok') {
             console.error(`[digest]   ${verdict.status.toUpperCase()}: ${verdict.reason}`);
+        }
+
+        // Verification runs before anything else is decided, so a role that
+        // contradicts its own remote tag never reaches the digest at all.
+        if (search.verifyRemote && result.fresh.length > 0) {
+            const before = result.fresh.length;
+            result = { ...result, fresh: await verifyRemote(search, result.fresh, runtime, installed) };
+            console.error(`[digest]   verified: ${result.fresh.length} of ${before} postings support the remote claim`);
         }
 
         const afterMarks = applyMarks(result.fresh, marks);

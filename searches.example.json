@@ -1,7 +1,7 @@
 {
   "searches": [
     {
-      "name": "India \u00b7 performance marketing",
+      "name": "Remote \u00b7 performance marketing",
       "actor": "linkedin/jobs",
       "input": {
         "keywords": "performance marketing",
@@ -11,15 +11,21 @@
         "eligibleFrom": "IN",
         "maxResults": 60
       },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
       "display": [
         "title",
         "company",
         "location",
+        "workplace",
         "postedAt"
       ]
     },
     {
-      "name": "India \u00b7 growth marketing",
+      "name": "Remote \u00b7 growth marketing",
       "actor": "linkedin/jobs",
       "input": {
         "keywords": "growth marketing",
@@ -27,17 +33,23 @@
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 40
+        "maxResults": 60
       },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
       "display": [
         "title",
         "company",
         "location",
+        "workplace",
         "postedAt"
       ]
     },
     {
-      "name": "India \u00b7 paid media and paid social",
+      "name": "Remote \u00b7 paid media",
       "actor": "linkedin/jobs",
       "input": {
         "keywords": "paid media",
@@ -45,151 +57,136 @@
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 40
+        "maxResults": 60
       },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
       "display": [
         "title",
         "company",
         "location",
+        "workplace",
         "postedAt"
       ]
     },
     {
-      "name": "India \u00b7 D2C and ecommerce marketing",
+      "name": "Remote \u00b7 meta ads",
       "actor": "linkedin/jobs",
       "input": {
-        "keywords": "ecommerce marketing manager",
+        "keywords": "meta ads",
         "location": "India",
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 40
+        "maxResults": 60
       },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
       "display": [
         "title",
         "company",
         "location",
+        "workplace",
         "postedAt"
       ]
     },
     {
-      "name": "United States \u00b7 performance & growth marketing",
+      "name": "Freelance \u00b7 performance & growth marketing",
       "actor": "linkedin/jobs",
       "input": {
         "keywords": "performance marketing",
-        "location": "United States",
+        "location": "India",
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 40,
-        "excludeRestricted": false
+        "maxResults": 60,
+        "jobTypes": [
+          "freelance",
+          "contract",
+          "temporary",
+          "part-time"
+        ]
       },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
       "display": [
         "title",
         "company",
         "location",
-        "eligibility",
+        "workplace",
         "postedAt"
       ]
     },
     {
-      "name": "United States \u00b7 paid media",
+      "name": "Freelance \u00b7 paid media and ads",
       "actor": "linkedin/jobs",
       "input": {
         "keywords": "paid media",
-        "location": "United States",
+        "location": "India",
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
-        "maxResults": 40,
-        "excludeRestricted": false
+        "maxResults": 60,
+        "jobTypes": [
+          "freelance",
+          "contract",
+          "temporary",
+          "part-time"
+        ]
       },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
       "display": [
         "title",
         "company",
         "location",
-        "eligibility",
+        "workplace",
         "postedAt"
       ]
     },
     {
-      "name": "Europe \u00b7 performance & growth marketing",
+      "name": "Freelance \u00b7 marketing consultant",
       "actor": "linkedin/jobs",
       "input": {
-        "keywords": "performance marketing",
-        "location": "European Union",
+        "keywords": "marketing consultant",
+        "location": "India",
         "remoteOnly": true,
         "postedWithinDays": 7,
         "eligibleFrom": "IN",
         "maxResults": 40,
-        "excludeRestricted": false
+        "jobTypes": [
+          "freelance",
+          "contract",
+          "temporary"
+        ]
       },
+      "verifyRemote": true,
+      "keepVerdicts": [
+        "remote",
+        "unclear"
+      ],
       "display": [
         "title",
         "company",
         "location",
-        "eligibility",
+        "workplace",
         "postedAt"
       ]
     },
     {
-      "name": "United Kingdom \u00b7 performance & growth marketing",
-      "actor": "linkedin/jobs",
-      "input": {
-        "keywords": "performance marketing",
-        "location": "United Kingdom",
-        "remoteOnly": true,
-        "postedWithinDays": 7,
-        "eligibleFrom": "IN",
-        "maxResults": 40,
-        "excludeRestricted": false
-      },
-      "display": [
-        "title",
-        "company",
-        "location",
-        "eligibility",
-        "postedAt"
-      ]
-    },
-    {
-      "name": "Remote-first companies \u00b7 all marketing roles (labelled)",
-      "actor": "jobs/ats-boards",
-      "input": {
-        "boards": [
-          "greenhouse:gitlab",
-          "greenhouse:webflow",
-          "greenhouse:cloudflare",
-          "greenhouse:hubspot",
-          "ashby:linear",
-          "ashby:vanta",
-          "ashby:ramp",
-          "ashby:replit",
-          "lever:netflix",
-          "recruitee:channable",
-          "recruitee:hygraph"
-        ],
-        "titleIncludes": [
-          "performance marketing",
-          "growth marketing",
-          "paid media",
-          "demand generation",
-          "paid acquisition",
-          "lifecycle marketing"
-        ],
-        "eligibleFrom": "IN",
-        "excludeRestricted": false
-      },
-      "display": [
-        "title",
-        "account",
-        "location",
-        "eligibility",
-        "publishedAt"
-      ]
-    },
-    {
-      "name": "Rare: globally-open growth roles at remote-first companies",
+      "name": "Rare: globally-open roles at remote-first companies",
       "actor": "jobs/ats-boards",
       "input": {
         "boards": [

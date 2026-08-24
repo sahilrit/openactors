@@ -1,6 +1,6 @@
 {
   "title": "LinkedIn Job Search",
-  "description": "Searches LinkedIn job listings and returns title, company, location, posted date and a direct link. Uses LinkedIn's public job-search endpoint \u2014 the one its own logged-out site calls \u2014 so no account, cookie or login is involved and there is nothing that can be restricted. Filter by keywords, location, remote-only and how recently the role was posted.",
+  "description": "Searches LinkedIn job listings and returns title, company, location, posted date and a direct link. Uses LinkedIn's public job-search endpoint \u2014 the one its own logged-out site calls \u2014 so no account, cookie or login is involved and there is nothing that can be restricted. Filter by keywords, location, remote-only, employment type (including contract and freelance) and how recently the role was posted.",
   "tags": [
     "linkedin",
     "jobs",
@@ -53,6 +53,21 @@
         "type": "boolean",
         "description": "Drop roles whose location rules you out. On by default. Set false to keep them, still labelled with `eligibility` and a reason \u2014 useful when you want to see a restricted role and judge it yourself, since a posting is sometimes stricter than the employer.",
         "default": true
+      },
+      "jobTypes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "full-time",
+            "contract",
+            "freelance",
+            "part-time",
+            "temporary",
+            "internship"
+          ]
+        },
+        "description": "Restrict to these employment types. Freelance work is posted as contract or temporary \u2014 there is no separate freelance category on LinkedIn \u2014 so \"freelance\" maps onto contract. Omit to include every type."
       }
     },
     "required": [

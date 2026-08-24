@@ -18,6 +18,14 @@ export interface SavedSearch {
     /** Fields shown in the digest, in order. Falls back to a sensible guess. */
     display?: string[];
     timeoutSecs?: number;
+    /**
+     * Read each posting and keep only those whose text supports the remote
+     * claim. A job board's remote filter is a tag, not a fact — of 242 roles
+     * tagged remote here, 74 said otherwise in the body.
+     */
+    verifyRemote?: boolean;
+    /** Verdicts to keep when verifying. Defaults to remote and unclear. */
+    keepVerdicts?: string[];
 }
 
 export interface DigestConfig {
