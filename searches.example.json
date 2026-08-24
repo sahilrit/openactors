@@ -1,7 +1,7 @@
 {
   "searches": [
     {
-      "name": "Performance marketing in India, posted this week",
+      "name": "India \u00b7 performance marketing",
       "actor": "linkedin/jobs",
       "input": {
         "keywords": "performance marketing",
@@ -11,7 +11,66 @@
         "eligibleFrom": "IN",
         "maxResults": 60
       },
-      "display": ["title", "company", "location", "postedAt"]
+      "display": [
+        "title",
+        "company",
+        "location",
+        "postedAt"
+      ]
+    },
+    {
+      "name": "India \u00b7 growth marketing",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "growth marketing",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "display": [
+        "title",
+        "company",
+        "location",
+        "postedAt"
+      ]
+    },
+    {
+      "name": "India \u00b7 paid media and paid social",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "paid media",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "display": [
+        "title",
+        "company",
+        "location",
+        "postedAt"
+      ]
+    },
+    {
+      "name": "India \u00b7 D2C and ecommerce marketing",
+      "actor": "linkedin/jobs",
+      "input": {
+        "keywords": "ecommerce marketing manager",
+        "location": "India",
+        "remoteOnly": true,
+        "postedWithinDays": 7,
+        "eligibleFrom": "IN",
+        "maxResults": 40
+      },
+      "display": [
+        "title",
+        "company",
+        "location",
+        "postedAt"
+      ]
     },
     {
       "name": "Rare: globally-open growth roles at remote-first companies",
@@ -21,16 +80,36 @@
           "greenhouse:gitlab",
           "greenhouse:webflow",
           "greenhouse:cloudflare",
+          "greenhouse:hubspot",
           "ashby:linear",
           "ashby:vanta",
           "ashby:ramp",
-          "ashby:replit"
+          "ashby:replit",
+          "lever:netflix",
+          "recruitee:channable",
+          "recruitee:hygraph"
         ],
-        "titleIncludes": ["performance marketing", "growth marketing", "paid media", "demand generation"],
+        "titleIncludes": [
+          "performance marketing",
+          "growth marketing",
+          "paid media",
+          "demand generation",
+          "paid acquisition",
+          "lifecycle marketing"
+        ],
         "eligibleFrom": "IN"
       },
-      "display": ["title", "account", "location", "eligibility", "publishedAt"]
+      "display": [
+        "title",
+        "account",
+        "location",
+        "eligibility",
+        "publishedAt"
+      ]
     }
   ],
-  "output": { "dir": "digests", "keepDays": 90 }
+  "output": {
+    "dir": "digests",
+    "keepDays": 90
+  }
 }
