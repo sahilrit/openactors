@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { loadConfig, PROJECT_ROOT, type SavedSearch } from './digest/config.js';
 import { diff, loadState, prune, saveState } from './digest/state.js';
 import { assessHealth, recordYield, type HealthVerdict, type SearchHealth } from './digest/health.js';
-import { applyMarks, markKey, type MarkStore } from './digest/marks.js';
+import { applyMarks, followUpsDue, markKey, type MarkStore } from './digest/marks.js';
 import { inferDisplay, renderHtml, renderMarkdown, type SearchResult } from './digest/render.js';
 import { discoverActors } from './registry.js';
 import { Runtime } from './runtime.js';
@@ -202,6 +202,11 @@ async function main(): Promise<void> {
     await saveState(state);
     await healthStore.setValue('health', health);
 
+    // Chasing is surfaced beside new roles: an application going cold is worth
+    // more attention than another listing, and a separate report would be one
+    // more thing to remember to open.
+    const chases = followUpsDue(marks, config.output.followUpAfterDays ?? 7, now);
+
     const outDir = resolve(PROJECT_ROOT, config.output.dir);
     await mkdir(outDir, { recursive: true });
 
@@ -212,9 +217,9 @@ async function main(): Promise<void> {
     const stamp = `${now.toISOString().slice(0, 10)}-${now.toISOString().slice(11, 16).replace(':', '')}`;
     const written: string[] = [];
     for (const [name, body] of [
-        [`${stamp}.md`, renderMarkdown(results, now)],
+        [`${stamp}.md`, renderMarkdown(results, now, chases)],
         [`${stamp}.html`, renderHtml(results, now)],
-        ['latest.md', renderMarkdown(results, now)],
+        ['latest.md', renderMarkdown(results, now, chases)],
         ['latest.html', renderHtml(results, now)],
     ] as const) {
         const file = join(outDir, name);
@@ -234,6 +239,7 @@ async function main(): Promise<void> {
     for (const r of unhealthy) {
         console.log(`  ${r.health!.status.toUpperCase()}  ${r.name}: ${r.health!.reason}`);
     }
+    if (chases.length > 0) console.log(`  ${chases.length} application(s) worth chasing`);
     for (const result of results.filter((r) => r.fresh.length > 0)) {
         console.log(`  ${result.fresh.length.toString().padStart(4)}  ${result.name}`);
     }

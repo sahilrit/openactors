@@ -452,6 +452,24 @@ get-marked-jobs
 unmark-job  urls: [...]
 ```
 
+### Chasing what has gone quiet
+
+Applications recorded with `mark-job` are tracked, and any that has been silent
+past `followUpAfterDays` (default 7) appears at the **top** of the digest —
+above new roles, because a conversation already started is worth more than
+another listing, and anything below a hundred new rows never gets read.
+
+```
+get-follow-ups    afterDays: 7
+record-response   url: …  response: replied | rejected | interview | offer
+record-follow-up  urls: [...]
+```
+
+Two rules stop it becoming noise. Any response at all — **including a
+rejection** — ends the chase, because following up after a reply reads as not
+having read their message. And a recorded follow-up resets the clock, so one
+silence is not flagged every single day.
+
 That is what separates a working list from a feed: without it every role you
 have already decided about comes back forever, and the only record of your own
 decisions is your memory.

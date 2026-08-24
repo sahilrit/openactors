@@ -553,6 +553,7 @@
   ],
   "output": {
     "dir": "digests",
-    "keepDays": 90
+    "keepDays": 90,
+    "followUpAfterDays": 7
   }
 }

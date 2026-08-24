@@ -35,7 +35,14 @@ function linkOf(item: Record<string, unknown>): string | null {
     return null;
 }
 
-export function renderMarkdown(results: SearchResult[], now: Date): string {
+export interface FollowUpRow {
+    url: string;
+    title?: string;
+    company?: string;
+    daysSince: number;
+}
+
+export function renderMarkdown(results: SearchResult[], now: Date, chases: FollowUpRow[] = []): string {
     const total = results.reduce((sum, r) => sum + r.fresh.length, 0);
     const date = now.toISOString().slice(0, 10);
 
@@ -43,6 +50,18 @@ export function renderMarkdown(results: SearchResult[], now: Date): string {
 
     // Warnings go first. A search that has quietly stopped working is the one
     // thing in this document you cannot afford to scroll past.
+    // Chases come before new roles. A conversation already started is worth
+    // more than another listing, and putting it below a hundred new rows means
+    // it never gets read.
+    if (chases.length > 0) {
+        lines.push(`## Chase these (${chases.length})`, '',
+            '| Applied | Role | Company | Link |', '|---|---|---|---|');
+        for (const c of chases) {
+            lines.push(`| ${c.daysSince}d ago | ${c.title ?? '—'} | ${c.company ?? '—'} | [open](${c.url}) |`);
+        }
+        lines.push('');
+    }
+
     const unhealthy = results.filter((r) => r.health && r.health.status !== 'ok');
     if (unhealthy.length > 0) {
         lines.push('> **Check these searches**', '>');

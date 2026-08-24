@@ -1,6 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { mergeMark, type Mark, type MarkStore } from '../digest/marks.js';
+import {
+    followUpsDue, mergeMark, recordFollowUp, recordResponse,
+    type Mark, type MarkStore, type Response,
+} from '../digest/marks.js';
 import { openKeyValueStore } from '../storage.js';
 import { fail, text } from './shared.js';
 
@@ -63,6 +66,59 @@ export function registerMarkTools(server: McpServer): void {
                 .slice(0, limit)
                 .map(([url, record]) => ({ url, ...record }));
             return text({ total: rows.length, jobs: rows });
+        },
+    );
+
+    server.registerTool(
+        'get-follow-ups',
+        {
+            title: 'Applications worth chasing',
+            description:
+                'Lists roles applied to that have gone quiet, longest wait first. Anything that ' +
+                'has had a response — including a rejection — is excluded, and an application ' +
+                'already chased inside the window is not chased again.',
+            inputSchema: {
+                afterDays: z.number().int().min(1).max(90).default(7).describe('Silence before a chase is due.'),
+            },
+        },
+        async ({ afterDays }) => {
+            const due = followUpsDue(await load(), afterDays);
+            if (due.length === 0) return text(`Nothing to chase — no application has been quiet for ${afterDays} days.`);
+            return text({ total: due.length, followUps: due });
+        },
+    );
+
+    server.registerTool(
+        'record-response',
+        {
+            title: 'Record what an employer said',
+            description:
+                'Note that an employer replied, rejected, invited you to interview or made an offer. ' +
+                'Stops that application appearing in follow-ups.',
+            inputSchema: {
+                url: z.string(),
+                response: z.enum(['replied', 'rejected', 'interview', 'offer']),
+            },
+        },
+        async ({ url, response }) => {
+            const before = await load();
+            const after = recordResponse(before, url, response as Response);
+            if (after === before) return fail(`No application recorded for ${url}. Mark it applied first.`);
+            await save(after);
+            return text({ url, response, recorded: true });
+        },
+    );
+
+    server.registerTool(
+        'record-follow-up',
+        {
+            title: 'Note that you chased',
+            description: 'Records that you followed up, so the same silence is not flagged again immediately.',
+            inputSchema: { urls: z.array(z.string()).min(1) },
+        },
+        async ({ urls }) => {
+            await save(recordFollowUp(await load(), urls));
+            return text({ followedUp: urls.length });
         },
     );
 

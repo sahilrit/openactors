@@ -34,6 +34,8 @@ export interface DigestConfig {
         dir: string;
         /** Days a key stays remembered. Bounds state growth on long-lived searches. */
         keepDays: number;
+        /** Silence before an application is worth chasing. */
+        followUpAfterDays?: number;
     };
 }
 
