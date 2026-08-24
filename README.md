@@ -373,6 +373,28 @@ an interrupted run cannot mark items seen that were never reported.
 
 Renaming a search resets its history — names key the state.
 
+### Finding work that is remote *and* open to you
+
+A country search on a general board returns roles that are remote *within* that
+country — remote from Austin, still requiring US work authorisation. Measured
+here twice, across hundreds of postings: none were open from India.
+
+`jobs/remote-boards` reads RemoteOK, Remotive and Himalayas instead. These
+publish an explicit restriction field — `Worldwide`, `USA`, `Germany, Austria` —
+which is the difference between "remote" and "remote and open to you", and
+`eligibleFrom` judges against it.
+
+Two things learned the hard way from those feeds. RemoteOK's tags are close to
+noise — a retail role tagged `dev, node, math`, a quality-systems role tagged
+`marketing` — so matching runs on titles, not tags. And its feed carries local
+jobs with city restrictions, which `worldwideOnly` removes.
+
+Himalayas serves twenty roles per request against a feed of six figures, so it
+is walked by cursor; without paging it contributes almost nothing.
+
+**Set expectations from the numbers.** In one sweep of 617 listings, four were
+open from India. That is not the tool underperforming — it is the supply.
+
 ### Verifying the remote claim
 
 A saved search can set `verifyRemote: true`. Every posting is then opened and

@@ -186,6 +186,69 @@
       ]
     },
     {
+      "name": "Worldwide \u00b7 remote-first boards (open from India)",
+      "actor": "jobs/remote-boards",
+      "input": {
+        "keywords": [
+          "marketing",
+          "growth",
+          "paid media",
+          "advertis",
+          "demand generation",
+          "performance",
+          "seo",
+          "ecommerce",
+          "crm",
+          "lifecycle",
+          "brand",
+          "content"
+        ],
+        "eligibleFrom": "IN",
+        "excludeRestricted": true,
+        "maxPerBoard": 150
+      },
+      "display": [
+        "title",
+        "company",
+        "board",
+        "restriction",
+        "postedAt"
+      ],
+      "timeoutSecs": 600
+    },
+    {
+      "name": "Worldwide \u00b7 remote-first boards (all, labelled)",
+      "actor": "jobs/remote-boards",
+      "input": {
+        "keywords": [
+          "marketing",
+          "growth",
+          "paid media",
+          "advertis",
+          "demand generation",
+          "performance",
+          "seo",
+          "ecommerce",
+          "crm",
+          "lifecycle",
+          "brand",
+          "content"
+        ],
+        "eligibleFrom": "IN",
+        "excludeRestricted": false,
+        "maxPerBoard": 150
+      },
+      "display": [
+        "title",
+        "company",
+        "board",
+        "restriction",
+        "eligibility",
+        "postedAt"
+      ],
+      "timeoutSecs": 600
+    },
+    {
       "name": "Rare: globally-open roles at remote-first companies",
       "actor": "jobs/ats-boards",
       "input": {

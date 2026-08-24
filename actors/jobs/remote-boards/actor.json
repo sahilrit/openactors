@@ -1,0 +1,65 @@
+{
+  "title": "Remote Job Boards",
+  "description": "Fetches roles from job boards that list only remote work \u2014 RemoteOK, Remotive and Himalayas. Unlike a country search on a general board, these carry an explicit restriction field saying where the candidate may be, which is the difference between a role that is remote within the US and one open to you from anywhere. Filter by keywords and by the country you would work from. Public JSON, no key, no scraping.",
+  "tags": [
+    "jobs",
+    "remote",
+    "worldwide",
+    "freelance",
+    "remoteok",
+    "remotive",
+    "himalayas"
+  ],
+  "input": {
+    "type": "object",
+    "properties": {
+      "keywords": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Keep roles whose title, category or tags contain one of these (case-insensitive). Example: [\"marketing\", \"growth\", \"paid media\"]."
+      },
+      "boards": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "remoteok",
+            "remotive",
+            "himalayas"
+          ]
+        },
+        "description": "Boards to read. Omit to read all of them."
+      },
+      "eligibleFrom": {
+        "type": "string",
+        "description": "ISO-3166 alpha-2 country code, e.g. \"IN\". Each role gains an eligibility verdict from its stated restriction; roles restricted elsewhere are dropped unless excludeRestricted is false."
+      },
+      "excludeRestricted": {
+        "type": "boolean",
+        "description": "Drop roles whose restriction rules you out. On by default; set false to keep them labelled.",
+        "default": true
+      },
+      "postedWithinDays": {
+        "type": "integer",
+        "description": "Only roles posted within this many days.",
+        "minimum": 1,
+        "maximum": 90
+      },
+      "maxPerBoard": {
+        "type": "integer",
+        "description": "Cap results taken from any single board, applied after filtering.",
+        "default": 100,
+        "minimum": 1,
+        "maximum": 500
+      },
+      "worldwideOnly": {
+        "type": "boolean",
+        "description": "Keep only roles whose restriction says worldwide, anywhere or global. RemoteOK's feed carries local jobs with a city restriction; this removes them.",
+        "default": false
+      }
+    },
+    "additionalProperties": false
+  }
+}
