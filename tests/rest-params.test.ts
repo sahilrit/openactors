@@ -59,7 +59,7 @@ describe('parsePostPage', () => {
         headline: 'A headline',
         articleBody: 'The body of the post.',
         commentCount: 2,
-        author: { name: 'Sahil Sachdeva', url: 'https://www.linkedin.com/in/sahilrit' },
+        author: { name: 'A Poster', url: 'https://www.linkedin.com/in/a-poster' },
         interactionStatistic: [
             { interactionType: 'http://schema.org/LikeAction', userInteractionCount: 7 },
         ],
@@ -77,7 +77,7 @@ describe('parsePostPage', () => {
     it('pulls out body, author, counts and comments', () => {
         const post = parsePostPage(page(sample), sample['@id']);
         expect(post.text).toBe('The body of the post.');
-        expect(post.authorName).toBe('Sahil Sachdeva');
+        expect(post.authorName).toBe('A Poster');
         expect(post.totalReactions).toBe(7);
         expect(post.commentCount).toBe(2);
         expect(post.activityId).toBe('7236288582401884162');
