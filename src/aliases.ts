@@ -13,6 +13,10 @@ export const ACTOR_ALIASES: Record<string, string> = {
     'compass/crawler-google-places': 'maps/google-maps',
     'compass/google-maps-scraper': 'maps/google-maps',
     'nwua9Gu5YrADL7ZDj/google-maps-scraper': 'maps/google-maps',
+    'apimaestro/linkedin-post-detail': 'linkedin/post-detail',
+    'supreme_coder/linkedin-post': 'linkedin/post-detail',
+    'apimaestro/linkedin-post-comments-replies-engagements-scraper-no-cookies':
+        'linkedin/post-comments',
 };
 
 export function resolveActorName(requested: string): string {

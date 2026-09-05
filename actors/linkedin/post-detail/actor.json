@@ -1,0 +1,21 @@
+{
+  "title": "LinkedIn Post Detail",
+  "description": "Returns the body, author, reaction count and comment count of a public LinkedIn post, from its URL, activity id or urn. Reads the logged-out public page and the schema.org block LinkedIn embeds in it, so no account, cookie or login is involved. Posts that are private, deleted or login-walled report themselves as unavailable rather than returning an empty shell.",
+  "tags": ["linkedin", "post", "social", "content"],
+  "input": {
+    "type": "object",
+    "properties": {
+      "post_urls": {
+        "type": "array",
+        "description": "Post URLs, activity ids, or urn:li:activity urns.",
+        "items": { "type": "string" }
+      },
+      "maxItems": {
+        "type": "integer",
+        "description": "Cap on posts fetched.",
+        "default": 25
+      }
+    },
+    "required": ["post_urls"]
+  }
+}
