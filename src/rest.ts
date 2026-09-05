@@ -65,7 +65,12 @@ function describeActor(actor: ActorManifest) {
     };
 }
 
-function parseIntParam(value: string | null, fallback: number, min: number, max: number): number {
+export function parseIntParam(value: string | null, fallback: number, min: number, max: number): number {
+    // `Number(null)` is 0, not NaN, so an absent parameter used to sail past the
+    // isFinite guard and clamp to `min` instead of `fallback`. That silently gave
+    // every unspecified `limit` a value of 1 and every unspecified `timeout` five
+    // seconds. Absent and empty are settled here, before the numeric parse.
+    if (value === null || value.trim() === '') return fallback;
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(max, Math.max(min, Math.trunc(parsed)));

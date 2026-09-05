@@ -16,5 +16,10 @@ export const ACTOR_ALIASES: Record<string, string> = {
 };
 
 export function resolveActorName(requested: string): string {
-    return ACTOR_ALIASES[requested] ?? requested.replace(/~/g, '/');
+    // Apify ids travel in both `owner/name` and `owner~name` form, and clients
+    // built against its REST API send the tilde. Normalise first, then look the
+    // alias up, or a tilde id would miss the table and resolve to a local name
+    // that does not exist.
+    const normalized = requested.replace(/~/g, '/');
+    return ACTOR_ALIASES[normalized] ?? normalized;
 }
