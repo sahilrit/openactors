@@ -1,0 +1,26 @@
+{
+  "title": "LinkedIn Post Comments",
+  "description": "Returns the comments LinkedIn shows on the logged-out view of a public post: commenter name, comment text, timestamp and reaction count. No account, cookie or login is involved. Read-only by design: the public view carries no comment URNs, so these comments identify who said what but cannot be used to address a reply. It also omits nested replies and truncates long threads.",
+  "tags": ["linkedin", "comments", "social", "engagement"],
+  "input": {
+    "type": "object",
+    "properties": {
+      "postIds": {
+        "type": "array",
+        "description": "Post URLs, activity ids, or urn:li:activity urns.",
+        "items": { "type": "string" }
+      },
+      "maxItems": {
+        "type": "integer",
+        "description": "Cap on comments returned per post.",
+        "default": 20
+      },
+      "scrapeReplies": {
+        "type": "boolean",
+        "description": "Accepted for compatibility. The logged-out view exposes no nested replies, so this changes nothing and is reported in the run summary.",
+        "default": false
+      }
+    },
+    "required": ["postIds"]
+  }
+}

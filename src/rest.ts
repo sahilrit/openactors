@@ -65,7 +65,12 @@ function describeActor(actor: ActorManifest) {
     };
 }
 
-function parseIntParam(value: string | null, fallback: number, min: number, max: number): number {
+export function parseIntParam(value: string | null, fallback: number, min: number, max: number): number {
+    // `Number(null)` is 0, not NaN, so an absent parameter used to sail past the
+    // isFinite guard and clamp to `min` instead of `fallback`. That silently gave
+    // every unspecified `limit` a value of 1 and every unspecified `timeout` five
+    // seconds. Absent and empty are settled here, before the numeric parse.
+    if (value === null || value.trim() === '') return fallback;
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(max, Math.max(min, Math.trunc(parsed)));
@@ -147,6 +152,82 @@ export async function handleRest(req: IncomingMessage, res: ServerResponse, deps
                 }
                 return fail(res, 409, (err as Error).message), true;
             }
+            return true;
+        }
+
+        // POST /v2/acts/:actorId/run-sync-get-dataset-items
+        // Apify's one-shot endpoint: start the run, wait for it, and return the
+        // dataset items themselves rather than a run record. Clients written
+        // against mcp.apify.com call this and expect a bare array back, so this
+        // response deliberately has no { data } envelope.
+        if (
+            segments[0] === 'acts' &&
+            segments[2] === 'run-sync-get-dataset-items' &&
+            segments.length === 3 &&
+            method === 'POST'
+        ) {
+            const actor = await findActor(segments[1]);
+            if (!actor) return fail(res, 404, `Actor "${segments[1]}" not found.`), true;
+
+            const input = (await readBody(req)) as Record<string, unknown>;
+            const timeoutSecs = parseIntParam(url.searchParams.get('timeout'), 300, 5, 3600);
+            const memoryMbytes = url.searchParams.has('memory')
+                ? parseIntParam(url.searchParams.get('memory'), 2048, 128, 16384)
+                : undefined;
+
+            let record;
+            try {
+                record = await runtime.start(actor, input, { timeoutSecs, memoryMbytes, origin: 'API' });
+            } catch (err) {
+                if (err instanceof ActorInputError) {
+                    return fail(res, 400, `Invalid input for "${actor.name}"`, { errors: err.errors }), true;
+                }
+                return fail(res, 409, (err as Error).message), true;
+            }
+
+            // No timeout argument: wait for the run to actually finish. The
+            // actor's own timeoutSecs bounds it, so this cannot hang forever.
+            const settled = await runtime.waitFor(record.id);
+            if (settled) record = settled;
+            if (record.status === 'FAILED') {
+                return (
+                    fail(res, 400, `Run failed for "${actor.name}".`, {
+                        runId: record.id,
+                        status: record.status,
+                    }),
+                    true
+                );
+            }
+
+            let dataset;
+            try {
+                dataset = await openDataset(record.defaultDatasetId);
+            } catch {
+                return fail(res, 404, `Dataset for run "${record.id}" not found.`), true;
+            }
+
+            const offset = parseIntParam(url.searchParams.get('offset'), 0, 0, Number.MAX_SAFE_INTEGER);
+            const limit = parseIntParam(url.searchParams.get('limit'), 1000, 1, 100_000);
+            const { items } = await dataset.getData({ offset, limit });
+
+            // A scrape that pages until a source cuts it off lands on TIMED-OUT or
+            // ABORTED holding real rows. Throwing those away would be worse than
+            // returning them, so partial results come back with the run's status in
+            // a header and only an empty partial run is treated as an error.
+            if (record.status !== 'SUCCEEDED') {
+                if (items.length === 0) {
+                    return (
+                        fail(res, 400, `Run ${record.status.toLowerCase()} for "${actor.name}" with no items.`, {
+                            runId: record.id,
+                            status: record.status,
+                        }),
+                        true
+                    );
+                }
+                res.setHeader('x-openactors-run-status', record.status);
+                res.setHeader('x-openactors-run-id', record.id);
+            }
+            json(res, 200, items);
             return true;
         }
 

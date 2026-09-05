@@ -13,8 +13,17 @@ export const ACTOR_ALIASES: Record<string, string> = {
     'compass/crawler-google-places': 'maps/google-maps',
     'compass/google-maps-scraper': 'maps/google-maps',
     'nwua9Gu5YrADL7ZDj/google-maps-scraper': 'maps/google-maps',
+    'apimaestro/linkedin-post-detail': 'linkedin/post-detail',
+    'supreme_coder/linkedin-post': 'linkedin/post-detail',
+    'apimaestro/linkedin-post-comments-replies-engagements-scraper-no-cookies':
+        'linkedin/post-comments',
 };
 
 export function resolveActorName(requested: string): string {
-    return ACTOR_ALIASES[requested] ?? requested.replace(/~/g, '/');
+    // Apify ids travel in both `owner/name` and `owner~name` form, and clients
+    // built against its REST API send the tilde. Normalise first, then look the
+    // alias up, or a tilde id would miss the table and resolve to a local name
+    // that does not exist.
+    const normalized = requested.replace(/~/g, '/');
+    return ACTOR_ALIASES[normalized] ?? normalized;
 }
